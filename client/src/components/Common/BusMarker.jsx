@@ -60,10 +60,10 @@ const BusMarker = ({ bus, onClick, isActive = false }) => {
           </div>
         </div>
         
-        {bus.latitude && bus.longitude && (
+        {bus.latitude && bus.longitude && !isNaN(parseFloat(bus.latitude)) && !isNaN(parseFloat(bus.longitude)) && (
           <div className="mt-2 text-xs text-gray-500">
             <i className="fas fa-map-marker-alt mr-1"></i>
-            {bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}
+            {parseFloat(bus.latitude).toFixed(4)}, {parseFloat(bus.longitude).toFixed(4)}
           </div>
         )}
       </div>

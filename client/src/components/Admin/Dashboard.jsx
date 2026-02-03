@@ -2,8 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import { busService } from '../../services/busService';
+import api from '../../services/api';
+import {
+  UserGroupIcon,
+  UserIcon,
+  AcademicCapIcon,
+  TruckIcon,
+  ClockIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon
+} from '@heroicons/react/20/solid';
 import StatCard from '../UI/StatCard';
-import RecentActivity from '../UI/RecentActivity';
 import ChartComponent from '../UI/ChartComponent';
 
 const AdminDashboard = () => {
@@ -14,11 +23,8 @@ const AdminDashboard = () => {
     totalAdmins: 0,
     totalBuses: 0,
     activeBuses: 0,
-    inactiveBuses: 0
+    delayedBuses: 0
   });
-  const [recentUsers, setRecentUsers] = useState([]);
-  const [recentBuses, setRecentBuses] = useState([]);
-  const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,232 +34,459 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch users and buses
-      const [usersResponse, busesResponse] = await Promise.all([
-        userService.getAllUsers(),
-        busService.getAllBuses()
-      ]);
 
-      const users = usersResponse?.users || [];
-      const buses = busesResponse || [];
+      // Fetch real data from backend
+      const response = await api.get('/api/admin/dashboard');
 
-      // Calculate stats
-      const totalUsers = users.length;
-      const totalStudents = users.filter(u => u.role === 'student').length;
-      const totalDrivers = users.filter(u => u.role === 'driver').length;
-      const totalAdmins = users.filter(u => u.role === 'admin').length;
-      const totalBuses = buses.length;
-      
-      // Active buses (updated in last 10 minutes)
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-      const activeBuses = buses.filter(bus => 
-        new Date(bus.updatedAt) >= tenMinutesAgo
-      ).length;
-
-      // Recent users (last 5)
-      const recentUsers = users
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 5)
-        .map(user => ({
-          ...user,
-          date: new Date(user.createdAt).toLocaleDateString()
-        }));
-
-      // Recent buses (last 5)
-      const recentBuses = buses
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-        .slice(0, 5)
-        .map(bus => ({
-          ...bus,
-          date: new Date(bus.updatedAt).toLocaleDateString()
-        }));
-
-      // Prepare chart data (mock data for now)
-      const mockChartData = {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        datasets: [
-          {
-            label: 'Active Users',
-            data: [65, 59, 80, 81, 56, 55, 40],
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            borderColor: 'rgb(59, 130, 246)',
-            tension: 0.4
-          },
-          {
-            label: 'Bus Updates',
-            data: [28, 48, 40, 19, 86, 27, 90],
-            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-            borderColor: 'rgb(16, 185, 129)',
-            tension: 0.4
-          }
-        ]
-      };
-
-      setStats({
-        totalUsers,
-        totalStudents,
-        totalDrivers,
-        totalAdmins,
-        totalBuses,
-        activeBuses,
-        inactiveBuses: totalBuses - activeBuses
-      });
-      setRecentUsers(recentUsers);
-      setRecentBuses(recentBuses);
-      setChartData(mockChartData);
+      if (response.data.success) {
+        const { stats } = response.data;
+        setStats({
+          totalUsers: stats.totalUsers || 0,
+          totalStudents: stats.totalStudents || 0,
+          totalDrivers: stats.totalDrivers || 0,
+          totalAdmins: stats.totalAdmins || 0,
+          totalBuses: stats.totalBuses || 0,
+          activeBuses: stats.activeBuses || 0,
+          delayedBuses: stats.inactiveBuses || 0
+        });
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Set zero values on error
+      setStats({
+        totalUsers: 0,
+        totalStudents: 0,
+        totalDrivers: 0,
+        totalAdmins: 0,
+        totalBuses: 0,
+        activeBuses: 0,
+        delayedBuses: 0
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
-        </div>
-      </div>
-    );
-  }
+  // ========== CHART CONFIGURATIONS WITH REAL DATA ==========
+
+  // 1. User Distribution Pie Chart
+  const userDistributionData = {
+    labels: ['Students', 'Drivers', 'Admins'],
+    datasets: [{
+      data: [stats.totalStudents, stats.totalDrivers, stats.totalAdmins],
+      backgroundColor: [
+        'rgba(59, 130, 246, 0.8)',  // Blue for Students
+        'rgba(16, 185, 129, 0.8)',  // Green for Drivers
+        'rgba(139, 92, 246, 0.8)',  // Purple for Admins
+      ],
+      borderColor: [
+        'rgb(59, 130, 246)',
+        'rgb(16, 185, 129)',
+        'rgb(139, 92, 246)',
+      ],
+      borderWidth: 2,
+    }]
+  };
+
+  const pieChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12,
+            weight: '500'
+          }
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            const label = context.label || '';
+            const value = context.parsed || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    }
+  };
+
+  // 2. Bus Status Bar Chart
+  const busStatusData = {
+    labels: ['Active Buses', 'Inactive Buses'],
+    datasets: [{
+      label: 'Bus Count',
+      data: [stats.activeBuses, stats.delayedBuses],
+      backgroundColor: [
+        'rgba(16, 185, 129, 0.8)',  // Green for Active
+        'rgba(245, 158, 11, 0.8)',  // Orange for Inactive
+      ],
+      borderColor: [
+        'rgb(16, 185, 129)',
+        'rgb(245, 158, 11)',
+      ],
+      borderWidth: 2,
+      borderRadius: 8,
+    }]
+  };
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return `Count: ${context.parsed.y}`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          borderDash: [2],
+          drawBorder: false,
+        },
+        ticks: {
+          font: {
+            size: 11
+          }
+        }
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: '500'
+          }
+        }
+      }
+    }
+  };
+
+  // 3. User Roles Horizontal Bar Chart
+  const userRolesData = {
+    labels: ['Students', 'Drivers', 'Admins'],
+    datasets: [{
+      label: 'User Count',
+      data: [stats.totalStudents, stats.totalDrivers, stats.totalAdmins],
+      backgroundColor: [
+        'rgba(59, 130, 246, 0.8)',
+        'rgba(16, 185, 129, 0.8)',
+        'rgba(139, 92, 246, 0.8)',
+      ],
+      borderColor: [
+        'rgb(59, 130, 246)',
+        'rgb(16, 185, 129)',
+        'rgb(139, 92, 246)',
+      ],
+      borderWidth: 2,
+      borderRadius: 8,
+    }]
+  };
+
+  const horizontalBarOptions = {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return `Count: ${context.parsed.x}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        grid: {
+          borderDash: [2],
+          drawBorder: false,
+        },
+        ticks: {
+          font: {
+            size: 11
+          }
+        }
+      },
+      y: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: '500'
+          }
+        }
+      }
+    }
+  };
+
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Overview of your bus tracking system
-        </p>
+    <div className="w-full space-y-6">
+      {/* Header Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div className="flex-1">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Admin Dashboard</h1>
+            <p className="mt-1 text-gray-600">Welcome back! Here's your system overview for today.</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200 shadow-sm">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              System Active
+            </span>
+            <button
+              onClick={fetchDashboardData}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow"
+            >
+              <i className="fas fa-sync-alt mr-2"></i>
+              Refresh
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Main Stats Grid - 4 Columns on Desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard
           title="Total Users"
           value={stats.totalUsers}
-          icon="fas fa-users"
+          icon={UserGroupIcon}
           color="blue"
           trend="+12%"
+          trendUp={true}
+          loading={loading}
         />
         <StatCard
           title="Students"
           value={stats.totalStudents}
-          icon="fas fa-user-graduate"
+          icon={AcademicCapIcon}
           color="green"
           trend="+8%"
+          trendUp={true}
+          loading={loading}
         />
         <StatCard
           title="Drivers"
           value={stats.totalDrivers}
-          icon="fas fa-user-tie"
-          color="orange"
+          icon={UserIcon}
+          color="purple"
           trend="+5%"
+          trendUp={true}
+          loading={loading}
         />
         <StatCard
-          title="Buses"
+          title="Total Buses"
           value={stats.totalBuses}
-          icon="fas fa-bus"
-          color="purple"
+          icon={TruckIcon}
+          color="amber"
           trend="+15%"
+          trendUp={true}
+          loading={loading}
         />
       </div>
 
-      {/* Chart */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Weekly Activity</h2>
-          <div className="flex items-center gap-4">
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
-              Week
-            </button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
-              Month
-            </button>
-            <button className="px-4 py-2 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg">
-              Year
-            </button>
+      {/* Secondary Stats Grid - 3 Columns on Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Active Buses Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Active Buses</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.activeBuses}</p>
+              <div className="flex items-center gap-2 mt-4">
+                <ArrowTrendingUpIcon className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-700">All systems operational</span>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-green-100 flex-shrink-0">
+              <TruckIcon className="w-6 h-6 text-green-600" />
+            </div>
           </div>
         </div>
-        <div className="h-80">
-          <ChartComponent data={chartData} type="line" />
+
+        {/* Delayed Buses Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Delayed Buses</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.delayedBuses}</p>
+              <div className="flex items-center gap-2 mt-4">
+                <ArrowTrendingDownIcon className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-700">Needs attention</span>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-amber-100 flex-shrink-0">
+              <ClockIcon className="w-6 h-6 text-amber-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* System Admins Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">System Admins</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalAdmins}</p>
+              <p className="text-sm font-medium text-gray-600 mt-4">Managing system operations</p>
+            </div>
+            <div className="p-3 rounded-lg bg-blue-100 flex-shrink-0">
+              <UserGroupIcon className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <RecentActivity
-          title="Recent Users"
-          items={recentUsers}
-          type="users"
-          emptyMessage="No recent users"
-          onViewAll={() => window.location.href = '/admin/users'}
-        />
-        <RecentActivity
-          title="Recent Buses"
-          items={recentBuses}
-          type="buses"
-          emptyMessage="No recent buses"
-          onViewAll={() => window.location.href = '/admin/buses'}
-        />
+      {/* Data Visualization Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        {/* 1. User Distribution Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">User Distribution</h2>
+            <p className="text-sm text-gray-600 mt-1">Breakdown by role</p>
+          </div>
+          <div className="h-80">
+            <ChartComponent data={userDistributionData} options={pieChartOptions} type="pie" />
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">Total Users:</span>
+              <span className="font-bold text-gray-900">{stats.totalUsers}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Bus Status Bar Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Bus Activity Status</h2>
+            <p className="text-sm text-gray-600 mt-1">Active vs Inactive buses</p>
+          </div>
+          <div className="h-80">
+            <ChartComponent data={busStatusData} options={barChartOptions} type="bar" />
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">Total Buses:</span>
+              <span className="font-bold text-gray-900">{stats.totalBuses}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. User Roles Horizontal Bar Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2 xl:col-span-1">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">User Roles Comparison</h2>
+            <p className="text-sm text-gray-600 mt-1">Count by user type</p>
+          </div>
+          <div className="h-80">
+            <ChartComponent data={userRolesData} options={horizontalBarOptions} type="bar" />
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-gray-600">Students</p>
+              <p className="text-lg font-bold text-blue-600">{stats.totalStudents}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Drivers</p>
+              <p className="text-lg font-bold text-green-600">{stats.totalDrivers}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Admins</p>
+              <p className="text-lg font-bold text-purple-600">{stats.totalAdmins}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active Buses</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.activeBuses}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
-              <i className="fas fa-bus text-green-600 text-xl"></i>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center text-sm text-gray-600">
-              <i className="fas fa-info-circle mr-2"></i>
-              <span>Updated in last 10 minutes</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Inactive Buses</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.inactiveBuses}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center">
-              <i className="fas fa-bus-slash text-red-600 text-xl"></i>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center text-sm text-gray-600">
-              <i className="fas fa-exclamation-triangle mr-2"></i>
-              <span>Not updated in 10+ minutes</span>
-            </div>
+      {/* Recent Activity Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-6">Recent Activity</h2>
+          <div className="space-y-5">
+            {[
+              { text: 'New student registration', time: '2 min ago', icon: 'user-plus', color: 'green' },
+              { text: 'Bus #12 location updated', time: '5 min ago', icon: 'map-marker-alt', color: 'blue' },
+              { text: 'Driver assigned to Bus #08', time: '10 min ago', icon: 'user-check', color: 'purple' },
+              { text: 'Route #5 modified', time: '15 min ago', icon: 'route', color: 'orange' },
+              { text: 'System backup completed', time: '1 hour ago', icon: 'check-circle', color: 'green' },
+            ].map((activity, index) => (
+              <div key={index} className="flex gap-4">
+                <div className={`p-2 rounded-lg bg-${activity.color}-100 flex-shrink-0`}>
+                  <i className={`fas fa-${activity.icon} text-${activity.color}-600 text-sm`}></i>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{activity.text}</p>
+                  <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Admins</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalAdmins}</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-6">System Summary</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <i className="fas fa-users text-blue-600"></i>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Total Students</p>
+                  <p className="text-xs text-gray-500">Active users</p>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">{stats.totalStudents}</p>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-              <i className="fas fa-shield-alt text-blue-600 text-xl"></i>
+
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <i className="fas fa-user-tie text-green-600"></i>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Active Drivers</p>
+                  <p className="text-xs text-gray-500">On duty</p>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{stats.totalDrivers}</p>
             </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center text-sm text-gray-600">
-              <i className="fas fa-user-shield mr-2"></i>
-              <span>System administrators</span>
+
+            <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <i className="fas fa-bus text-amber-600"></i>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Active Buses</p>
+                  <p className="text-xs text-gray-500">Currently running</p>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-amber-600">{stats.activeBuses}</p>
             </div>
           </div>
         </div>

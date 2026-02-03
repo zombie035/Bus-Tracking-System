@@ -13,11 +13,28 @@
     "build": "cd client && npm run build",
     "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm run install-all && npm run build"
   },
-  "keywords": ["bus", "tracking", "react", "express"],
+  "keywords": [
+    "bus",
+    "tracking",
+    "react",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "autoprefixer": "^10.4.23",
     "concurrently": "^8.2.2",
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "cors": "^2.8.6",
+    "express-rate-limit": "^8.2.1",
+    "mongo": "^0.1.0",
+    "pg": "^8.17.2",
+    "psql": "^0.0.1",
+    "react-toastify": "^11.0.5"
   }
 }

@@ -6,6 +6,8 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [buses, setBuses] = useState([]);
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     name: '',
     email: '',
     password: '',
@@ -18,20 +20,22 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name || '',
-        email: user.email || '',
-        password: '',
-        confirmPassword: '',
-        role: user.role || 'student',
-        studentId: user.studentId || '',
-        phone: user.phone || '',
-        busNumber: user.busAssigned?.busNumber || ''
-      });
-    }
-    fetchAvailableBuses();
-  }, [user]);
+  if (user) {
+    setFormData({
+      firstName: user.name ? user.name.split(' ')[0] : '',
+      lastName: user.name ? user.name.split(' ').slice(1).join(' ') : '',
+      name: user.name || '',
+      email: user.email || '',
+      password: '',
+      confirmPassword: '',
+      role: user.role || 'student',
+      studentId: user.studentId || user.student_id || '',
+      phone: user.phone || '',
+      busNumber: user.busAssigned?.busNumber || user.bus_assigned || ''
+    });
+  }
+  fetchAvailableBuses();
+}, [user]);
 
   const fetchAvailableBuses = async () => {
     try {
@@ -48,8 +52,11 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
     const newErrors = {};
     
     if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
+    
+    if (formData.role === 'student') {
+      if (!formData.email.trim()) newErrors.email = 'Email is required';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
+    }
     
     if (!user && !formData.password) {
       newErrors.password = 'Password is required';
@@ -71,48 +78,62 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Update the handleSubmit function in UserForm.jsx
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
+  e.preventDefault();
+  
+  if (!validateForm()) {
+    return;
+  }
+
+  setLoading(true);
+  try {
+    // Build user data based on role
+    let userData = {
+      name: formData.name || `${formData.firstName} ${formData.lastName}`.trim(),
+      email: formData.email,
+      role: formData.role,
+      phone: formData.phone || ''
+    };
+
+    // Add studentId for students
+    if (formData.role === 'student') {
+      userData.studentId = formData.studentId || '';
     }
 
-    setLoading(true);
-    try {
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        phone: formData.phone,
-        studentId: formData.studentId,
-        busNumber: formData.busNumber
-      };
-
-      // Only include password if provided
-      if (formData.password) {
-        userData.password = formData.password;
-      }
-
-      let response;
-      if (user) {
-        response = await userService.updateUser(user._id, userData);
-      } else {
-        response = await userService.createUser(userData);
-      }
-
-      if (response.success) {
-        onSuccess();
-      } else {
-        setErrors({ submit: response.message || 'An error occurred' });
-      }
-    } catch (error) {
-      console.error('Error saving user:', error);
-      setErrors({ submit: error.message || 'Failed to save user' });
-    } finally {
-      setLoading(false);
+    // Only include password if provided (for new users)
+    if (!user && formData.password) {
+      userData.password = formData.password;
     }
-  };
+
+    // Add bus assignment if selected
+    if (formData.busNumber) {
+      userData.busAssigned = formData.busNumber;
+    }
+
+    console.log('📤 Sending user data:', userData);
+
+    let response;
+    if (user) {
+      const userId = user._id || user.id;
+      response = await userService.updateUser(userId, userData);
+    } else {
+      response = await userService.createUser(userData);
+    }
+
+    // Handle response
+    if (response.id || response.success !== false) {
+      onSuccess();
+    } else {
+      setErrors({ submit: response.message || 'An error occurred' });
+    }
+  } catch (error) {
+    console.error('Error saving user:', error);
+    setErrors({ submit: error.message || 'Failed to save user' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -141,119 +162,205 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Full Name *
-          </label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className={`block w-full px-4 py-3 border ${
-              errors.name ? 'border-red-300' : 'border-gray-300'
-            } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-            placeholder="John Doe"
-          />
-          {errors.name && (
-            <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address *
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className={`block w-full px-4 py-3 border ${
-              errors.email ? 'border-red-300' : 'border-gray-300'
-            } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-            placeholder="john@college.edu"
-          />
-          {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-          )}
-        </div>
+      {/* Role Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Role *
+        </label>
+        <select
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="student">Student</option>
+          <option value="driver">Driver</option>
+        </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Role *
-          </label>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="student">Student</option>
-            <option value="driver">Driver</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
+      {/* Role-based Form Fields */}
+      {formData.role === 'driver' && (
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className={`block w-full px-4 py-3 border ${
+                errors.name ? 'border-red-300' : 'border-gray-300'
+              } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+              placeholder="John Doe"
+            />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+            )}
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="+1234567890"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="+1234567890"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bus Number (Optional)
+            </label>
+            <select
+        name="busNumber"
+        value={formData.busNumber}
+        onChange={handleChange}
+        className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        <option value="">Select a bus (optional)</option>
+        {buses.map(bus => (
+          <option key={bus.id || bus._id || bus.busNumber} value={bus.busNumber}>
+            Bus {bus.busNumber} - {bus.routeName || 'No route'}
+          </option>
+        ))}
+      </select>
+          </div>
         </div>
-      </div>
+      )}
 
       {formData.role === 'student' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Student ID *
-          </label>
-          <input
-            type="text"
-            name="studentId"
-            value={formData.studentId}
-            onChange={handleChange}
-            className={`block w-full px-4 py-3 border ${
-              errors.studentId ? 'border-red-300' : 'border-gray-300'
-            } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-            placeholder="STU001"
-          />
-          {errors.studentId && (
-            <p className="mt-1 text-sm text-red-600">{errors.studentId}</p>
-          )}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name *
+              </label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={(e) => {
+                  handleChange(e);
+                  // Update full name
+                  setFormData(prev => ({
+                    ...prev,
+                    name: `${e.target.value} ${prev.lastName}`.trim()
+                  }));
+                }}
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="John"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name (Optional)
+              </label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={(e) => {
+                  handleChange(e);
+                  // Update full name
+                  setFormData(prev => ({
+                    ...prev,
+                    name: `${prev.firstName} ${e.target.value}`.trim()
+                  }));
+                }}
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Doe"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="+1234567890"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email *
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className={`block w-full px-4 py-3 border ${
+                errors.email ? 'border-red-300' : 'border-gray-300'
+              } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+              placeholder="john@college.edu"
+            />
+            {errors.email && (
+              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Student Roll No *
+            </label>
+            <input
+              type="text"
+              name="studentRollNo"
+              value={formData.studentRollNo}
+              onChange={(e) => {
+                handleChange(e);
+                // Update studentId
+                setFormData(prev => ({
+                  ...prev,
+                  studentId: e.target.value
+                }));
+              }}
+              className={`block w-full px-4 py-3 border ${
+                errors.studentId ? 'border-red-300' : 'border-gray-300'
+              } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+              placeholder="STU001"
+            />
+            {errors.studentId && (
+              <p className="mt-1 text-sm text-red-600">{errors.studentId}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assign Bus *
+            </label>
+            <select
+  name="busNumber"
+  value={formData.busNumber}
+  onChange={handleChange}
+  className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+>
+  <option value="">Select a bus</option>
+  {buses.map(bus => (
+    <option key={bus.id || bus._id || bus.busNumber} value={bus.busNumber}>
+      Bus {bus.busNumber} - {bus.routeName || 'No route'}
+    </option>
+  ))}
+</select>
+          </div>
         </div>
       )}
 
-      {(formData.role === 'student' || formData.role === 'driver') && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Assign to Bus
-          </label>
-          <select
-            name="busNumber"
-            value={formData.busNumber}
-            onChange={handleChange}
-            className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select a bus (optional)</option>
-            {buses.map(bus => (
-              <option key={bus._id} value={bus.busNumber}>
-                Bus {bus.busNumber} - {bus.routeName || 'No route'}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {!user && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

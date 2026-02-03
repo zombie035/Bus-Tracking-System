@@ -9,7 +9,7 @@ const useGeolocation = (options = {}) => {
 
   const defaultOptions = {
     enableHighAccuracy: true,
-    timeout: 5000,
+    timeout: 30000, // Increased from 5 seconds to 30 seconds to allow GPS to acquire signal
     maximumAge: 0,
     ...options
   };
@@ -92,11 +92,11 @@ const useGeolocation = (options = {}) => {
   const getErrorMessage = (error) => {
     switch (error.code) {
       case error.PERMISSION_DENIED:
-        return 'Location access denied. Please enable location services.';
+        return 'Location access denied. Please enable location services in your browser settings.';
       case error.POSITION_UNAVAILABLE:
-        return 'Location information is unavailable.';
+        return 'Location information is unavailable. Please check your GPS/location services.';
       case error.TIMEOUT:
-        return 'Location request timed out.';
+        return 'Location request timed out. Please ensure GPS is enabled and try again.';
       default:
         return 'An unknown error occurred while getting location.';
     }

@@ -1,213 +1,95 @@
-PROJECT CODE BUNDLE
-Generated: 1/20/2026, 6:35:53 PM
-Total Files: 30
-
+============================================================
+FILE: config\db.js
 ============================================================
 
 
+// PostgreSQL connection using 'pg' package
+const { Pool } = require('pg');
 
-============================================================
-FILE: bundle-code.js
-============================================================
+const pool = new Pool({
+  connectionString: 'postgresql://app_user:strongpassword@localhost:5432/bus_tracking',
+});
 
-const fs = require('fs');
-const path = require('path');
-
-// Configuration
-const OUTPUT_FILE = 'combined_code.txt';
-const INCLUDE_EXTENSIONS = ['.js', '.ejs', '.css', '.json', '.env'];
-const EXCLUDE_DIRS = ['node_modules', 'dist', 'build', '.git', '.vscode'];
-const EXCLUDE_FILES = ['package-lock.json', 'yarn.lock', 'combined_code.txt'];
-
-// Style for headers (you can customize these)
-const HEADER_STYLE = {
-  top: '='.repeat(60),
-  bottom: '='.repeat(60)
-};
-
-function shouldIncludeFile(filePath) {
-  const ext = path.extname(filePath);
-  const fileName = path.basename(filePath);
-  
-  // Check extension
-  if (!INCLUDE_EXTENSIONS.includes(ext)) {
-    return false;
-  }
-  
-  // Check excluded files
-  if (EXCLUDE_FILES.includes(fileName)) {
-    return false;
-  }
-  
-  // Check if in excluded directory
-  for (const excludeDir of EXCLUDE_DIRS) {
-    if (filePath.includes(`${path.sep}${excludeDir}${path.sep}`) || 
-        filePath.startsWith(`${excludeDir}${path.sep}`)) {
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-function processFile(filePath) {
-  try {
-    const relativePath = path.relative(process.cwd(), filePath);
-    const content = fs.readFileSync(filePath, 'utf8');
-    
-    let output = '\n\n';
-    output += `${HEADER_STYLE.top}\n`;
-    output += `FILE: ${relativePath}\n`;
-    output += `${HEADER_STYLE.bottom}\n\n`;
-    output += content;
-    
-    return output;
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return '';
-  }
-}
-
-function findFiles(dir) {
-  let files = [];
-  
-  try {
-    const items = fs.readdirSync(dir);
-    
-    for (const item of items) {
-      const fullPath = path.join(dir, item);
-      
-      try {
-        const stat = fs.statSync(fullPath);
-        
-        if (stat.isDirectory()) {
-          // Check if directory should be excluded
-          const dirName = path.basename(fullPath);
-          if (!EXCLUDE_DIRS.includes(dirName)) {
-            files = files.concat(findFiles(fullPath));
-          }
-        } else if (shouldIncludeFile(fullPath)) {
-          files.push(fullPath);
-        }
-      } catch (err) {
-        console.warn(`Skipping ${fullPath}: ${err.message}`);
-      }
-    }
-  } catch (error) {
-    console.error(`Error reading directory ${dir}:`, error.message);
-  }
-  
-  return files;
-}
-
-function bundleProject() {
-  console.log('📦 Bundling project files...');
-  console.log('Looking for extensions:', INCLUDE_EXTENSIONS.join(', '));
-  console.log('Excluding directories:', EXCLUDE_DIRS.join(', '));
-  
-  // Find all files
-  const allFiles = findFiles('.');
-  console.log(`Found ${allFiles.length} files to bundle\n`);
-  
-  if (allFiles.length === 0) {
-    console.log('❌ No files found with specified extensions!');
-    return;
-  }
-  
-  // Create output file
-  let combinedContent = `PROJECT CODE BUNDLE\n`;
-  combinedContent += `Generated: ${new Date().toLocaleString()}\n`;
-  combinedContent += `Total Files: ${allFiles.length}\n`;
-  combinedContent += `\n${'='.repeat(60)}\n\n`;
-  
-  // Process each file
-  allFiles.forEach((file, index) => {
-    console.log(`Processing [${index + 1}/${allFiles.length}]: ${path.relative(process.cwd(), file)}`);
-    combinedContent += processFile(file);
-  });
-  
-  // Write to file
-  fs.writeFileSync(OUTPUT_FILE, combinedContent, 'utf8');
-  
-  console.log(`\n✅ Done! All code bundled into: ${OUTPUT_FILE}`);
-  console.log(`📁 Total size: ${(combinedContent.length / 1024).toFixed(2)} KB`);
-  
-  // Show summary
-  console.log('\n📋 File Type Summary:');
-  const summary = {};
-  allFiles.forEach(file => {
-    const ext = path.extname(file);
-    summary[ext] = (summary[ext] || 0) + 1;
-  });
-  
-  Object.entries(summary).forEach(([ext, count]) => {
-    console.log(`  ${ext}: ${count} files`);
-  });
-}
-
-// Run the script
-bundleProject();
-
-============================================================
-FILE: config/db.js
-============================================================
-
-const mongoose = require('mongoose');
+let isConnected = false;
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("MongoDB Connected");
+    // Test the connection
+    const result = await pool.query('SELECT NOW()');
+    isConnected = true;
+    console.log('✅ Connected to PostgreSQL database at:', result.rows[0].now);
   } catch (error) {
-    console.error(error);
-    process.exit(1);
+    isConnected = false;
+    console.error('❌ PostgreSQL Connection Error:', error.message);
+    // Try to connect again in 3 seconds
+    setTimeout(connectDB, 3000);
   }
 };
 
 module.exports = connectDB;
+module.exports.pool = pool;
+module.exports.isConnected = () => isConnected;
+
+
 
 ============================================================
-FILE: controllers/adminController.js
+FILE: controllers\adminController.js
 ============================================================
 
 // controllers/adminController.js
 const User = require('../models/User');
 const Bus = require('../models/Bus');
 const bcrypt = require('bcryptjs');
+const { pool } = require('../config/db');
 
 // Admin Dashboard
 exports.dashboard = async (req, res) => {
   try {
     // Get counts for dashboard
-    const totalUsers = await User.countDocuments();
-    const totalStudents = await User.countDocuments({ role: 'student' });
-    const totalDrivers = await User.countDocuments({ role: 'driver' });
-    const totalAdmins = await User.countDocuments({ role: 'admin' });
-    const totalBuses = await Bus.countDocuments();
-    
+    const totalUsersResult = await pool.query('SELECT COUNT(*) as count FROM users');
+    const totalUsers = parseInt(totalUsersResult.rows[0].count);
+
+    const totalStudentsResult = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['student']);
+    const totalStudents = parseInt(totalStudentsResult.rows[0].count);
+
+    const totalDriversResult = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['driver']);
+    const totalDrivers = parseInt(totalDriversResult.rows[0].count);
+
+    const totalAdminsResult = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['admin']);
+    const totalAdmins = parseInt(totalAdminsResult.rows[0].count);
+
+    const totalBusesResult = await pool.query('SELECT COUNT(*) as count FROM buses');
+    const totalBuses = parseInt(totalBusesResult.rows[0].count);
+
     // Get active buses (updated in last 10 minutes)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    const activeBuses = await Bus.countDocuments({
-      updatedAt: { $gte: tenMinutesAgo }
-    });
-    
+    const activeBusesResult = await pool.query('SELECT COUNT(*) as count FROM buses WHERE updated_at >= $1', [tenMinutesAgo]);
+    const activeBuses = parseInt(activeBusesResult.rows[0].count);
+
     // Get recent buses
-    const recentBuses = await Bus.find()
-      .sort({ updatedAt: -1 })
-      .limit(5)
-      .populate('driverId', 'name email')
-      .populate('students', 'name email');
-    
+    const recentBusesResult = await pool.query(`
+      SELECT b.*, u.name as driver_name, u.email as driver_email
+      FROM buses b
+      LEFT JOIN users u ON b.driver_id = u.id
+      ORDER BY b.updated_at DESC
+      LIMIT 5
+    `);
+    const recentBuses = recentBusesResult.rows;
+
     // Get recent users
-    const recentUsers = await User.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select('name email role createdAt');
-    
-    // Render with user from session (not driver)
-    res.render('admin/dashboard', {
-      title: 'Admin Dashboard',
-      user: req.session,  // This is what should be used in the template
+    const recentUsersResult = await pool.query(`
+      SELECT id, name, email, role, created_at
+      FROM users
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+    const recentUsers = recentUsersResult.rows;
+
+    // Return JSON response
+    res.json({
+      success: true,
+      message: 'Admin dashboard data',
+      user: req.session,
       stats: {
         totalUsers,
         totalStudents,
@@ -222,79 +104,91 @@ exports.dashboard = async (req, res) => {
     });
   } catch (error) {
     console.error('Admin dashboard error:', error);
-    res.status(500).render('error', {
+    res.status(500).json({
+      success: false,
       message: 'Error loading dashboard',
       error: error.message
     });
   }
 };
 
-// User Management
+// Get all users
+// In adminController.js, update getUsers function:
 exports.getUsers = async (req, res) => {
   try {
-    const { role, search } = req.query;
-    
-    let filter = {};
-    
-    // Filter by role if specified
-    if (role && role !== 'all') {
-      filter.role = role;
-    }
-    
-    // Search by name or email
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { studentId: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    const users = await User.find(filter)
-      .sort({ createdAt: -1 })
-      .select('-password'); // Exclude password
-    
-    res.render('admin/users', {
-      title: 'User Management',
-      user: req.session,
-      users,
-      currentRole: role || 'all',
-      search: search || ''
+    const result = await pool.query('SELECT id, name, email, role, student_id as "studentId", phone, bus_assigned as "busAssigned" FROM users ORDER BY id ASC');
+    res.json({
+      success: true,
+      users: result.rows
     });
   } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).render('error', {
-      message: 'Error loading users',
-      error: error.message
+    console.error('Error fetching users:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error',
+      users: [] 
     });
   }
 };
 
-// Create new user
-// Create new user - FIXED VERSION
-// In adminController.js - Update createUser function
+// Create user
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role, studentId, phone, busNumber } = req.body;
+    const { name, email, password, role, studentId, phone, busAssigned } = req.body;
     
-    // Validate required fields
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email, password, and role are required',
-        formData: { name, email, role, studentId, phone, busNumber } // Return form data
-      });
+    // Validate role
+    if (role !== 'student' && role !== 'driver') {
+      return res.status(400).json({ message: 'Invalid role. Must be student or driver.' });
+    }
+
+    // Check if user exists
+    // Check email if provided
+    if (email) {
+      const check = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+      if (check.rows.length > 0) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
     }
     
-    // ... rest of your createUser function ...
+    // Check phone if provided (especially for drivers)
+    if (phone) {
+      const checkPhone = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
+      if (checkPhone.rows.length > 0) {
+        return res.status(400).json({ message: 'Phone number already exists' });
+      }
+    }
+
+    // For drivers, password defaults to phone if not provided
+    const plainPassword = (role === 'driver' && !password) ? phone : password;
     
+    if (!plainPassword) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    
+    // Sanitize busAssigned to ensure it's an integer or null
+    const busIdValue = (busAssigned && !isNaN(parseInt(busAssigned))) ? parseInt(busAssigned) : null;
+
+    // Check if bus exists if assigned
+    if (busIdValue) {
+      const busCheck = await pool.query('SELECT id FROM buses WHERE id = $1', [busIdValue]);
+      if (busCheck.rows.length === 0) {
+        return res.status(400).json({ message: 'Assigned bus does not exist' });
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, role, student_id, phone, bus_assigned)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, email, role, student_id, phone, bus_assigned`,
+      [name, email || null, hashedPassword, role, studentId || null, phone || null, busIdValue]
+    );
+    
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Create user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating user: ' + error.message,
-      formData: req.body // Return form data on error
-    });
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -302,70 +196,42 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, studentId, role, busNumber } = req.body;
-    
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    const { name, email, role, studentId, phone, busAssigned } = req.body;
+
+    // Validate role
+    if (role !== 'student' && role !== 'driver') {
+      return res.status(400).json({ message: 'Invalid role. Must be student or driver.' });
     }
     
-    // Update fields
-    user.name = name || user.name;
-    user.email = email || user.email;
-    user.phone = phone || user.phone;
-    user.role = role || user.role;
+    // If password is provided, it should be handled separately or added here with hashing
     
-    if (role === 'student') {
-      user.studentId = studentId || user.studentId;
+    // Sanitize busAssigned to ensure it's an integer or null
+    const busIdValue = (busAssigned && !isNaN(parseInt(busAssigned))) ? parseInt(busAssigned) : null;
+
+    // Check if bus exists if assigned
+    if (busIdValue) {
+      const busCheck = await pool.query('SELECT id FROM buses WHERE id = $1', [busIdValue]);
+      if (busCheck.rows.length === 0) {
+        return res.status(400).json({ message: 'Assigned bus does not exist' });
+      }
+    }
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET name = $1, email = $2, role = $3, student_id = $4, phone = $5, bus_assigned = $6
+       WHERE id = $7
+       RETURNING id, name, email, role, student_id, phone, bus_assigned`,
+      [name, email, role, studentId || null, phone || null, busIdValue, id]
+    );
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
     }
     
-    // Handle bus assignment changes
-    if (busNumber && role === 'student') {
-      const bus = await Bus.findOne({ busNumber });
-      if (!bus) {
-        return res.status(400).json({
-          success: false,
-          message: `Bus ${busNumber} not found`
-        });
-      }
-      
-      // Remove from old bus
-      if (user.busAssigned) {
-        await Bus.findByIdAndUpdate(user.busAssigned, {
-          $pull: { students: user._id }
-        });
-      }
-      
-      // Add to new bus
-      user.busAssigned = bus._id;
-      await Bus.findByIdAndUpdate(bus._id, {
-        $addToSet: { students: user._id }
-      });
-    }
-    
-    // Save user changes
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'User updated successfully',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
-    });
-    
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating user: ' + error.message
-    });
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -374,6 +240,27 @@ exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Optional: Check if user exists first
+    
+    const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// API: Get single user
+exports.getUser = async (req, res) => {
+  try {
+    console.log('🔵 Getting user:', req.params.id);
+    const { id } = req.params;
+
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
@@ -381,325 +268,126 @@ exports.deleteUser = async (req, res) => {
         message: 'User not found'
       });
     }
-    
-    // Remove user from bus assignments
-    if (user.role === 'student' && user.busAssigned) {
-      await Bus.findByIdAndUpdate(user.busAssigned, {
-        $pull: { students: user._id }
-      });
-    }
-    
-    if (user.role === 'driver') {
-      // Remove driver from bus
-      await Bus.updateMany(
-        { driverId: user._id },
-        { $unset: { driverId: '', driverName: '' } }
-      );
-    }
-    
-    // Delete user
-    await User.findByIdAndDelete(id);
-    
+
     res.json({
       success: true,
-      message: 'User deleted successfully'
-    });
-    
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting user: ' + error.message
-    });
-  }
-};
-
-// Bus Management
-exports.getBuses = async (req, res) => {
-  try {
-    const { status, search } = req.query;
-    
-    let filter = {};
-    
-    if (status && status !== 'all') {
-      filter.status = status;
-    }
-    
-    if (search) {
-      filter.$or = [
-        { busNumber: { $regex: search, $options: 'i' } },
-        { routeName: { $regex: search, $options: 'i' } },
-        { driverName: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    const buses = await Bus.find(filter)
-      .sort({ updatedAt: -1 })
-      .populate('driverId', 'name email')
-      .populate('students', 'name email');
-    
-    res.render('admin/buses', {
-      title: 'Bus Management',
-      user: req.session,
-      buses,
-      currentStatus: status || 'all',
-      search: search || ''
-    });
-  } catch (error) {
-    console.error('Get buses error:', error);
-    res.status(500).render('error', {
-      message: 'Error loading buses',
-      error: error.message
-    });
-  }
-};
-
-// Create new bus
-exports.createBus = async (req, res) => {
-  try {
-    const { busId, busNumber, routeName, capacity } = req.body;
-    
-    if (!busId || !busNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bus ID and Bus Number are required'
-      });
-    }
-    
-    // Check if bus already exists
-    const existingBus = await Bus.findOne({
-      $or: [{ busId }, { busNumber }]
-    });
-    
-    if (existingBus) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bus with this ID or number already exists'
-      });
-    }
-    
-    const bus = new Bus({
-      busId,
-      busNumber,
-      routeName,
-      capacity: capacity || 40,
-      status: 'stopped',
-      latitude: 12.9716, // Default location
-      longitude: 77.5946
-    });
-    
-    await bus.save();
-    
-    res.json({
-      success: true,
-      message: 'Bus created successfully',
-      bus: {
-        id: bus._id,
-        busId: bus.busId,
-        busNumber: bus.busNumber,
-        routeName: bus.routeName
+      user: {
+        _id: user.id,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        studentId: user.student_id,
+        phone: user.phone,
+        createdAt: user.created_at,
+        busAssigned: user.busAssigned || user.bus_assigned
       }
     });
-    
   } catch (error) {
-    console.error('Create bus error:', error);
+    console.error('❌ Get user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating bus: ' + error.message
-    });
-  }
-};
-
-// Update bus
-exports.updateBus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { busNumber, routeName, capacity, status, driverId } = req.body;
-    
-    const bus = await Bus.findById(id);
-    if (!bus) {
-      return res.status(404).json({
-        success: false,
-        message: 'Bus not found'
-      });
-    }
-    
-    bus.busNumber = busNumber || bus.busNumber;
-    bus.routeName = routeName || bus.routeName;
-    bus.capacity = capacity || bus.capacity;
-    bus.status = status || bus.status;
-    
-    if (driverId) {
-      const driver = await User.findById(driverId);
-      if (driver && driver.role === 'driver') {
-        bus.driverId = driver._id;
-        bus.driverName = driver.name;
-      }
-    }
-    
-    await bus.save();
-    
-    res.json({
-      success: true,
-      message: 'Bus updated successfully',
-      bus: {
-        id: bus._id,
-        busNumber: bus.busNumber,
-        routeName: bus.routeName
-      }
-    });
-    
-  } catch (error) {
-    console.error('Update bus error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating bus: ' + error.message
-    });
-  }
-};
-
-// Delete bus
-exports.deleteBus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const bus = await Bus.findById(id);
-    if (!bus) {
-      return res.status(404).json({
-        success: false,
-        message: 'Bus not found'
-      });
-    }
-    
-    // Unassign bus from all students
-    await User.updateMany(
-      { busAssigned: bus._id },
-      { $unset: { busAssigned: '' } }
-    );
-    
-    // Delete bus
-    await Bus.findByIdAndDelete(id);
-    
-    res.json({
-      success: true,
-      message: 'Bus deleted successfully'
-    });
-    
-  } catch (error) {
-    console.error('Delete bus error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting bus: ' + error.message
-    });
-  }
-};
-
-// Real-time Monitoring
-exports.monitor = async (req, res) => {
-  try {
-    const buses = await Bus.find()
-      .populate('driverId', 'name email')
-      .populate('students', 'name');
-    
-    res.render('admin/monitor', {
-      title: 'Real-time Monitoring',
-      user: req.session,
-      buses: JSON.stringify(buses)
-    });
-  } catch (error) {
-    console.error('Monitor error:', error);
-    res.status(500).render('error', {
-      message: 'Error loading monitoring',
-      error: error.message
-    });
-  }
-};
-
-// Get available drivers (for dropdown)
-exports.getAvailableDrivers = async (req, res) => {
-  try {
-    const drivers = await User.find({ role: 'driver' })
-      .select('name email')
-      .sort({ name: 1 });
-    
-    res.json({
-      success: true,
-      drivers
-    });
-  } catch (error) {
-    console.error('Get drivers error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error loading drivers'
-    });
-  }
-};
-
-// Get available buses (for dropdown)
-exports.getAvailableBuses = async (req, res) => {
-  try {
-    const buses = await Bus.find()
-      .select('busNumber routeName')
-      .sort({ busNumber: 1 });
-    
-    res.json({
-      success: true,
-      buses
-    });
-  } catch (error) {
-    console.error('Get buses dropdown error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error loading buses'
+      message: 'Error fetching user'
     });
   }
 };
 
 // Bulk import users (simple version)
+// In adminController.js, update the bulkImport function
 exports.bulkImport = async (req, res) => {
   try {
-    const { users } = req.body; // Array of user objects
-    
+    const { users } = req.body;
+
     if (!Array.isArray(users) || users.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No users provided'
       });
     }
-    
+
     const results = [];
     const errors = [];
-    
+
     for (const userData of users) {
       try {
-        // Create user
-        const user = new User({
-          ...userData,
-          password: await bcrypt.hash(userData.password || 'password123', 10)
-        });
-        
-        await user.save();
+        // Validate role
+        if (userData.role !== 'student' && userData.role !== 'driver') {
+          errors.push({
+            email: userData.email,
+            error: 'Invalid role. Must be student or driver.'
+          });
+          continue;
+        }
+
+        // Check if user already exists
+        // Use email or phone to check existence
+        let exists = false;
+        if (userData.email) {
+          const check = await pool.query('SELECT id FROM users WHERE email = $1', [userData.email]);
+          if (check.rows.length > 0) exists = true;
+        }
+        if (!exists && userData.phone) {
+          const check = await pool.query('SELECT id FROM users WHERE phone = $1', [userData.phone]);
+          if (check.rows.length > 0) exists = true;
+        }
+
+        if (exists) {
+          errors.push({
+            email: userData.email,
+            error: 'User already exists'
+          });
+          continue;
+        }
+
+        // Determine password
+        let plainPassword = userData.password;
+        if (userData.role === 'driver' && !plainPassword) {
+          plainPassword = userData.phone; // Driver password = phone
+        }
+        if (!plainPassword) plainPassword = 'password123'; // Fallback
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+        // Insert user
+        const result = await pool.query(
+          `INSERT INTO users (name, email, password, role, student_id, phone, bus_assigned, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+           RETURNING id, name, email, role, student_id, phone, bus_assigned`,
+          [
+            userData.name,
+            userData.email || null,
+            hashedPassword,
+            userData.role,
+            userData.studentId || null,
+            userData.phone || null,
+            null // bus_assigned, can be updated later
+          ]
+        );
+
         results.push({
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          status: 'success'
+          email: userData.email,
+          name: userData.name,
+          role: userData.role,
+          status: 'success',
+          id: result.rows[0].id
         });
       } catch (error) {
+        console.error('Error creating user:', error);
         errors.push({
           email: userData.email,
           error: error.message
         });
       }
     }
-    
+
     res.json({
       success: true,
-      message: `Imported ${results.length} users successfully`,
+      message: `Imported ${results.length} users successfully${errors.length > 0 ? `, ${errors.length} failed` : ''}`,
       results,
       errors: errors.length > 0 ? errors : undefined
     });
-    
+
   } catch (error) {
     console.error('Bulk import error:', error);
     res.status(500).json({
@@ -709,40 +397,547 @@ exports.bulkImport = async (req, res) => {
   }
 };
 
-// API: Get single user
-exports.getUser = async (req, res) => {
+// ========== ROUTE MANAGEMENT ==========
+
+// Get all routes
+exports.getRoutes = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const user = await User.findById(id).select('-password');
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    console.log('🔵 Fetching routes...');
+    const { search } = req.query;
+
+    let query = 'SELECT * FROM routes WHERE 1=1';
+    const values = [];
+
+    if (search) {
+      query += ' AND (route_name ILIKE $' + (values.length + 1) + ' OR route_number ILIKE $' + (values.length + 2) + ')';
+      values.push(`%${search}%`, `%${search}%`);
     }
-    
+
+    query += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(query, values);
+    const routes = result.rows.map(row => ({
+      _id: row.id,
+      id: row.id,
+      routeName: row.route_name,
+      routeNumber: row.route_number,
+      startingPoint: row.starting_point,
+      destinationPoint: row.destination_point,
+      stops: row.stops ? JSON.parse(row.stops) : [],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    console.log(`✅ Found ${routes.length} routes`);
+
     res.json({
       success: true,
-      user
+      routes: routes
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('❌ Get routes error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching user'
+      message: 'Error loading routes: ' + error.message,
+      routes: []
     });
   }
 };
 
-// API: Get single bus
+// Create new route
+exports.createRoute = async (req, res) => {
+  try {
+    console.log('🔵 Creating route with data:', req.body);
+    const { routeName, routeNumber, startingPoint, destinationPoint, stops = [] } = req.body;
+
+    // Validate required fields
+    if (!routeName || !startingPoint || !destinationPoint) {
+      console.warn('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Route name, starting point, and destination point are required',
+        formData: { routeName, routeNumber, startingPoint, destinationPoint, stops }
+      });
+    }
+
+    // Check if route number already exists (if provided)
+    if (routeNumber) {
+      const existingRoute = await pool.query('SELECT id FROM routes WHERE route_number = $1', [routeNumber]);
+      if (existingRoute.rows.length > 0) {
+        console.warn('❌ Route number already exists:', routeNumber);
+        return res.status(400).json({
+          success: false,
+          message: 'Route number already exists',
+          formData: { routeName, routeNumber, startingPoint, destinationPoint, stops }
+        });
+      }
+    }
+
+    // Create new route
+    console.log('💾 Creating route in database...');
+    const result = await pool.query(
+      `INSERT INTO routes (route_name, route_number, starting_point, destination_point, stops)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [routeName, routeNumber || null, startingPoint, destinationPoint, JSON.stringify(stops)]
+    );
+
+    const route = result.rows[0];
+
+    console.log(`✅ Route created successfully: ${routeName} (${route.id})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Route created successfully',
+      route: {
+        id: route.id,
+        routeName: route.route_name,
+        routeNumber: route.route_number,
+        startingPoint: route.starting_point,
+        destinationPoint: route.destination_point,
+        stops: route.stops ? JSON.parse(route.stops) : []
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create route error:', error.message, error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating route: ' + error.message,
+      formData: req.body
+    });
+  }
+};
+
+// Get single route
+exports.getRoute = async (req, res) => {
+  try {
+    console.log('🔵 Getting route:', req.params.id);
+    const { id } = req.params;
+
+    const result = await pool.query('SELECT * FROM routes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+    }
+
+    const route = result.rows[0];
+
+    res.json({
+      success: true,
+      route: {
+        _id: route.id,
+        id: route.id,
+        routeName: route.route_name,
+        routeNumber: route.route_number,
+        startingPoint: route.starting_point,
+        destinationPoint: route.destination_point,
+        stops: route.stops ? JSON.parse(route.stops) : [],
+        createdAt: route.created_at,
+        updatedAt: route.updated_at
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching route'
+    });
+  }
+};
+
+// Update route
+exports.updateRoute = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { routeName, routeNumber, startingPoint, destinationPoint, stops } = req.body;
+
+    const result = await pool.query(
+      `UPDATE routes
+       SET route_name = $1, route_number = $2, starting_point = $3, destination_point = $4, stops = $5, updated_at = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [routeName, routeNumber, startingPoint, destinationPoint, JSON.stringify(stops), id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+    }
+
+    const route = result.rows[0];
+
+    res.json({
+      success: true,
+      message: 'Route updated successfully',
+      route: {
+        id: route.id,
+        routeName: route.route_name,
+        routeNumber: route.route_number,
+        startingPoint: route.starting_point,
+        destinationPoint: route.destination_point,
+        stops: route.stops ? JSON.parse(route.stops) : []
+      }
+    });
+
+  } catch (error) {
+    console.error('Update route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating route: ' + error.message
+    });
+  }
+};
+
+// Delete route
+exports.deleteRoute = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query('DELETE FROM routes WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Route deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting route: ' + error.message
+    });
+  }
+};
+
+
+============================================================
+FILE: controllers\authController.js
+============================================================
+
+// server/controllers/authController.js
+const { pool } = require('../config/db');
+const bcrypt = require('bcryptjs');
+const User = require('../models/User');
+
+// Login Controller
+exports.login = async (req, res) => {
+  try {
+    // Accept identifier (email or phone) and password
+    const { identifier, email, password } = req.body;
+    const loginId = identifier || email; // Support both new and old field names
+
+    console.log('🔐 Login attempt for:', loginId);
+
+    // Validate input
+    if (!loginId || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username/Email and password are required'
+      });
+    }
+
+    // Determine if loginId is a phone number (digits only) or email
+    const isPhone = /^\d+$/.test(loginId);
+    let user;
+
+    if (isPhone) {
+      // Driver Login
+      user = await User.findByPhone(loginId);
+    } else {
+      // Student/Admin Login
+      user = await User.findByEmail(loginId);
+    }
+
+    if (!user) {
+      console.log('❌ User not found:', loginId);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Compare passwords
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      console.log('❌ Invalid password for:', loginId);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Set session
+
+    req.session.userId = user.id;
+    req.session.role = user.role;
+    req.session.name = user.name;
+    req.session.email = user.email;
+    req.session.busAssigned = user.bus_assigned || null;
+
+    console.log(`✅ Login successful for ${user.name} (${user.role})`);
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        studentId: user.student_id || null,
+        phone: user.phone || null,
+        busAssigned: user.bus_assigned || null
+      }
+    });
+  } catch (error) {
+    console.error('💥 Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error occurred. Please try again.'
+    });
+  }
+};
+
+// Logout Controller
+exports.logout = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: 'Logout failed'
+      });
+    }
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  });
+};
+
+// Check Authentication Status
+exports.checkAuth = (req, res) => {
+  if (req.session.userId) {
+    res.json({
+      authenticated: true,
+      user: {
+        id: req.session.userId,
+        name: req.session.name,
+        email: req.session.email,
+        role: req.session.role
+      }
+    });
+  } else {
+    res.json({
+      authenticated: false
+    });
+  }
+};
+
+// Register Controller
+exports.register = async (req, res) => {
+  try {
+    const { name, email, phone, password, confirmPassword, role, studentId } = req.body;
+
+    // Validate role
+    if (role && role !== 'student' && role !== 'driver') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Must be student or driver.'
+      });
+    }
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      });
+    }
+
+    let hashedPassword;
+    let finalEmail = email;
+    let finalPhone = phone;
+
+    // 🚚 DRIVER REGISTRATION LOGIC
+    if (role === 'driver') {
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Phone number is required for drivers' });
+      }
+      // Check if phone exists
+      const existingPhone = await User.findByPhone(phone);
+      if (existingPhone) {
+        return res.status(400).json({ success: false, message: 'Phone number already registered' });
+      }
+      // Password is the phone number
+      hashedPassword = await bcrypt.hash(phone, 10);
+      finalEmail = null; // Drivers might not have email
+    }
+    // 🎓 STUDENT REGISTRATION LOGIC
+    else {
+      if (!email || !password || !confirmPassword) {
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
+      }
+      if (password !== confirmPassword) {
+        return res.status(400).json({ success: false, message: 'Passwords do not match' });
+      }
+      const existingEmail = await User.findByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ success: false, message: 'Email already in use' });
+      }
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // Create new user
+    const insertQuery = `
+      INSERT INTO users (name, email, password, role, student_id, phone)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, email, role
+    `;
+    const values = [
+      name,
+      finalEmail,
+      hashedPassword,
+      role || 'student', // Default to student
+      studentId || null,
+      finalPhone || null
+    ];
+
+    const result = await pool.query(insertQuery, values);
+    const user = result.rows[0];
+
+    console.log(`✅ User registered: ${user.name} (${user.role})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('💥 Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error occurred. Please try again.'
+    });
+  }
+};
+
+// Create test accounts (for development only)
+exports.createTestAccounts = async (req, res) => {
+  try {
+    // Check if test accounts already exist
+    const adminExistsResult = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@college.edu']);
+
+    if (adminExistsResult.rows.length > 0) {
+      return res.json({
+        success: true,
+        message: 'Test accounts already exist'
+      });
+    }
+
+    const hashedAdminPass = await bcrypt.hash('admin123', 10);
+    const hashedDriverPass = await bcrypt.hash('8888888888', 10); // Password = Phone
+    const hashedStudentPass = await bcrypt.hash('student123', 10);
+
+    // Create admin account
+    await pool.query(`
+      INSERT INTO users (name, email, password, role, phone)
+      VALUES ($1, $2, $3, $4, $5)
+    `, ['Admin User', 'admin@college.edu', hashedAdminPass, 'admin', '9999999999']);
+
+    // Create driver account
+    await pool.query(`
+      INSERT INTO users (name, email, password, role, phone)
+      VALUES ($1, $2, $3, $4, $5)
+    `, ['John Driver', null, hashedDriverPass, 'driver', '8888888888']);
+
+    // Create student accounts
+    await pool.query(`
+      INSERT INTO users (name, email, password, role, student_id, phone)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, ['Alice Student', 'student@college.edu', hashedStudentPass, 'student', 'STU001', '7777777777']);
+
+    await pool.query(`
+      INSERT INTO users (name, email, password, role, student_id, phone)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, ['Bob Student', 'bob@college.edu', hashedStudentPass, 'student', 'STU002', '7777777778']);
+
+    console.log('✅ Test accounts created successfully');
+
+    res.json({
+      success: true,
+      message: 'Test accounts created',
+      testAccounts: [
+        { email: 'admin@college.edu', password: 'admin123', role: 'admin' },
+        { phone: '8888888888', password: '8888888888', role: 'driver' },
+        { email: 'student@college.edu', password: 'student123', role: 'student' },
+        { email: 'bob@college.edu', password: 'student123', role: 'student' }
+      ]
+    });
+  } catch (error) {
+    console.error('💥 Error creating test accounts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create test accounts'
+    });
+  }
+};
+
+
+============================================================
+FILE: controllers\busController.js
+============================================================
+
+// controllers/busController.js
+const { pool } = require('../config/db');
+const Bus = require('../models/Bus');
+
+// Get all buses
+exports.getBuses = async (req, res) => {
+  try {
+    console.log('🚌 Fetching all buses...');
+    
+    // Using Bus model's findWithDrivers method
+    const buses = await Bus.findWithDrivers();
+    
+    console.log(`✅ Found ${buses.length} buses`);
+    
+    res.json({
+      success: true,
+      buses: buses,
+      count: buses.length
+    });
+  } catch (error) {
+    console.error('❌ Error fetching buses:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch buses',
+      error: error.message
+    });
+  }
+};
+
+// Get single bus
 exports.getBus = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('🔍 Getting bus:', id);
     
-    const bus = await Bus.findById(id)
-      .populate('driverId', 'name email')
-      .populate('students', 'name email');
+    const bus = await Bus.findById(id);
     
     if (!bus) {
       return res.status(404).json({
@@ -753,588 +948,317 @@ exports.getBus = async (req, res) => {
     
     res.json({
       success: true,
-      bus
+      bus: bus
     });
   } catch (error) {
-    console.error('Get bus error:', error);
+    console.error('Error fetching bus:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching bus'
+      message: 'Failed to fetch bus'
     });
   }
 };
 
-// API: Update bus location
+// Create new bus
+exports.createBus = async (req, res) => {
+  try {
+    console.log('➕ Creating new bus with data:', req.body);
+    
+    const { 
+      busNumber, 
+      routeName, 
+      capacity, 
+      status, 
+      driverId,
+      latitude,
+      longitude 
+    } = req.body;
+    
+    // Validate required fields with better error messages
+    const errors = [];
+    if (!busNumber || busNumber.trim() === '') {
+      errors.push('Bus number is required');
+    }
+    if (!routeName || routeName.trim() === '') {
+      errors.push('Route name is required');
+    }
+    if (capacity && (isNaN(capacity) || capacity < 1 || capacity > 100)) {
+      errors.push('Capacity must be a number between 1 and 100');
+    }
+    if (latitude && isNaN(latitude)) {
+      errors.push('Latitude must be a valid number');
+    }
+    if (longitude && isNaN(longitude)) {
+      errors.push('Longitude must be a valid number');
+    }
+    
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors
+      });
+    }
+    
+    // Check if bus number already exists
+    const existingBus = await pool.query(
+      'SELECT * FROM buses WHERE bus_number = $1',
+      [busNumber]
+    );
+    
+    if (existingBus.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bus number already exists'
+      });
+    }
+    
+    // Create bus using Bus model
+    const bus = await Bus.create({
+      busNumber: busNumber.trim(),
+      routeName: routeName.trim(),
+      capacity: capacity ? parseInt(capacity) : 40,
+      status: status || 'active',
+      driverId: driverId || null,
+      latitude: latitude ? parseFloat(latitude) : 20.5937,
+      longitude: longitude ? parseFloat(longitude) : 78.9629
+    });
+    
+    console.log('✅ Bus created successfully:', bus);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Bus created successfully',
+      bus: bus
+    });
+  } catch (error) {
+    console.error('❌ Error creating bus:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create bus',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+// Update bus - UPDATED VERSION
+// server/controllers/busController.js
+
+// Update bus
+exports.updateBus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate numeric ID
+    const busId = parseInt(id);
+    if (isNaN(busId)) {
+       return res.status(400).json({ success: false, message: 'Invalid Bus ID' });
+    }
+
+    // Check for duplicate bus number if it's being changed
+    if (req.body.busNumber) {
+      const duplicateCheck = await pool.query(
+        'SELECT id FROM buses WHERE bus_number = $1 AND id != $2',
+        [req.body.busNumber, busId]
+      );
+      if (duplicateCheck.rows.length > 0) {
+        return res.status(400).json({ success: false, message: 'Bus number already exists' });
+      }
+    }
+
+    const updatedBus = await Bus.findByIdAndUpdate(busId, req.body);
+    
+    if (!updatedBus) {
+      return res.status(404).json({ success: false, message: 'Bus not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Bus updated successfully',
+      bus: updatedBus
+    });
+  } catch (error) {
+    console.error('❌ Error updating bus:', error);
+    res.status(500).json({ success: false, message: 'Failed to update bus' });
+  }
+};
+
+// Delete bus
+exports.deleteBus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deletedBus = await Bus.findByIdAndDelete(id);
+    
+    if (!deletedBus) {
+      return res.status(404).json({ success: false, message: 'Bus not found' });
+    }
+    
+    res.json({ success: true, message: 'Bus deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting bus:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete bus' });
+  }
+};
+
+// Get available drivers
+exports.getAvailableDrivers = async (req, res) => {
+  try {
+    console.log('👨‍✈️ Fetching available drivers...');
+    
+    const result = await pool.query(
+      "SELECT id, name, email, phone FROM users WHERE role = 'driver' ORDER BY name"
+    );
+    
+    res.json({
+      success: true,
+      drivers: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch drivers'
+    });
+  }
+};
+
+// Update bus location
 exports.updateBusLocation = async (req, res) => {
   try {
     const { id } = req.params;
     const { latitude, longitude, speed, status } = req.body;
     
-    const bus = await Bus.findById(id);
-    if (!bus) {
+    console.log('📍 Updating bus location:', id, { latitude, longitude, speed });
+    
+    // Validate coordinates
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required'
+      });
+    }
+    
+    const result = await pool.query(
+      `UPDATE buses 
+       SET latitude = $1, longitude = $2, speed = $3, status = $4, updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [latitude, longitude, speed || 0, status || 'moving', id]
+    );
+    
+    if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Bus not found'
       });
     }
     
-    bus.latitude = parseFloat(latitude);
-    bus.longitude = parseFloat(longitude);
-    bus.speed = speed || 0;
-    bus.status = status || 'moving';
-    bus.updatedAt = new Date();
+    const bus = result.rows[0];
     
-    await bus.save();
-    
-    // Broadcast to all connected clients
+    // Emit socket event for real-time updates
     const io = req.app.get('io');
-    io.emit('bus-update', bus);
+    if (io) {
+      io.to(`bus-${id}`).emit('bus-location-update', {
+        busId: id,
+        busNumber: bus.bus_number,
+        latitude: bus.latitude,
+        longitude: bus.longitude,
+        speed: bus.speed,
+        status: bus.status,
+        timestamp: new Date()
+      });
+    }
     
     res.json({
       success: true,
       message: 'Bus location updated',
-      bus
+      bus: bus
     });
   } catch (error) {
-    console.error('Update bus location error:', error);
+    console.error('Error updating bus location:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating bus location'
+      message: 'Failed to update bus location'
     });
   }
 };
 
-// API: Get live bus data
-exports.getLiveBuses = async (req, res) => {
+exports.getBusByNumber = async (req, res) => {
   try {
-    const buses = await Bus.find()
-      .populate('driverId', 'name email')
-      .populate('students', 'name email');
+    const { busNumber } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM buses WHERE bus_number = $1',
+      [busNumber]
+    );
     
-    res.json(buses);
-  } catch (error) {
-    console.error('Get live buses error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching live bus data'
-    });
-  }
-};
-
-// API: Get analytics data
-exports.getAnalytics = async (req, res) => {
-  try {
-    // Last 7 days data
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
-    // User registration stats
-    const userStats = await User.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: sevenDaysAgo }
-        }
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
-    
-    // Bus update stats
-    const busStats = await Bus.aggregate([
-      {
-        $match: {
-          updatedAt: { $gte: sevenDaysAgo }
-        }
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bus not found'
+      });
+    }
     
     res.json({
       success: true,
-      userStats,
-      busStats,
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      bus: result.rows[0]
     });
   } catch (error) {
-    console.error('Analytics error:', error);
+    console.error('Error fetching bus by number:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching analytics'
+      message: 'Failed to fetch bus'
     });
   }
 };
 
-// API: Export data
-exports.exportData = async (req, res) => {
+exports.getBusesByStatus = async (req, res) => {
   try {
-    const { type } = req.params;
-    const { format } = req.query;
+    const { status } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM buses WHERE status = $1',
+      [status]
+    );
     
-    if (type === 'users') {
-      const users = await User.find().select('-password');
-      
-      if (format === 'csv') {
-        // Convert to CSV
-        const csv = users.map(user => 
-          `${user.name},${user.email},${user.role},${user.studentId || ''},${user.phone || ''},${user.createdAt}`
-        ).join('\n');
-        
-        res.header('Content-Type', 'text/csv');
-        res.attachment('users.csv');
-        return res.send('Name,Email,Role,Student ID,Phone,Created At\n' + csv);
-      } else {
-        res.json({
-          success: true,
-          users
-        });
-      }
-    } else if (type === 'buses') {
-      const buses = await Bus.find()
-        .populate('driverId', 'name email')
-        .populate('students', 'name email');
-      
-      if (format === 'csv') {
-        // Convert to CSV
-        const csv = buses.map(bus => 
-          `${bus.busNumber},${bus.busId},${bus.routeName || ''},${bus.driverName || ''},${bus.status},${bus.latitude || ''},${bus.longitude || ''},${bus.updatedAt}`
-        ).join('\n');
-        
-        res.header('Content-Type', 'text/csv');
-        res.attachment('buses.csv');
-        return res.send('Bus Number,Bus ID,Route,Driver,Status,Latitude,Longitude,Last Updated\n' + csv);
-      } else {
-        res.json({
-          success: true,
-          buses
-        });
-      }
-    } else {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid export type'
-      });
-    }
+    res.json({
+      success: true,
+      buses: result.rows,
+      count: result.rows.length
+    });
   } catch (error) {
-    console.error('Export error:', error);
+    console.error('Error fetching buses by status:', error);
     res.status(500).json({
       success: false,
-      message: 'Error exporting data'
+      message: 'Failed to fetch buses'
     });
   }
 };
 
-============================================================
-FILE: controllers/authController.js
-============================================================
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Track Your Bus</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Inter', -apple-system, sans-serif;
-    }
-    
-    :root {
-      --primary: #1e293b;
-      --accent: #2563eb;
-      --surface: #ffffff;
-      --bg: #f8fafc;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --text-muted: #64748b;
-      --radius: 12px;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      padding-bottom: 20px;
-    }
-
-    .header {
-      background: var(--surface);
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header h1 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .main-container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 15px;
-      display: grid;
-      gap: 12px;
-    }
-
-    /* Map Styling */
-    .map-wrapper {
-      position: relative;
-      border-radius: var(--radius);
-      overflow: hidden;
-      border: 1px solid var(--border);
-      height: 400px;
-      background: #eee;
-    }
-
-    .map-wrapper.fullscreen {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      height: 100vh;
-      z-index: 9999;
-      border-radius: 0;
-    }
-
-    #map { height: 100%; width: 100%; z-index: 1; }
-
-    /* Map Overlays */
-    .map-controls {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .ctrl-btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      width: 38px; height: 38px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    /* Show Path Button - Positioned below map */
-    .btn-path {
-      width: 100%;
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 14px;
-      border-radius: var(--radius);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    .btn-path:active { opacity: 0.9; }
-
-    /* Info Cards */
-    .card {
-      background: var(--surface);
-      padding: 20px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-    }
-
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-    }
-
-    .info-item {
-      padding: 12px;
-      background: #f1f5f9;
-      border-radius: 8px;
-    }
-
-    .info-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 4px; }
-    .info-val { font-size: 0.95rem; font-weight: 600; color: var(--text); }
-
-    /* ETA Section */
-    .eta-box {
-      text-align: center;
-      padding: 12px;
-    }
-
-    .eta-val { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
-
-    /* Action Buttons */
-    .btn-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .btn-secondary {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 12px;
-      border-radius: 8px;
-      font-weight: 500;
-      font-size: 0.9rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    @media (max-width: 480px) {
-        .map-wrapper { height: 320px; }
-        .info-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
-
-  <div class="header">
-    <h1><i class="fas fa-bus-simple"></i> Bus Tracker</h1>
-    <div style="font-size: 0.75rem; color: #10b981; font-weight: 700; background: #ecfdf5; padding: 4px 10px; border-radius: 20px;">
-       <i class="fas fa-satellite-dish"></i> LIVE
-    </div>
-  </div>
-
-  <div class="main-container">
-    <% if (bus) { %>
-      
-      <div class="map-wrapper" id="mapWrapper">
-        <div id="map"></div>
-        <div class="map-controls">
-          <button class="ctrl-btn" onclick="toggleFullScreen()" title="Full Screen">
-            <i class="fas fa-expand" id="fsIcon"></i>
-          </button>
-          <button class="ctrl-btn" onclick="locateBus()"><i class="fas fa-bus"></i></button>
-          <button class="ctrl-btn" onclick="locateStudent()"><i class="fas fa-location-crosshairs"></i></button>
-        </div>
-      </div>
-
-      <button class="btn-path" onclick="toggleRoutePath()" id="togglePathBtn">
-          <i class="fas fa-route"></i> <span id="path-text">Show Route Path</span>
-      </button>
-
-      <div class="card">
-        <div class="info-grid">
-          <div class="info-item">
-            <p class="info-label">Bus Number</p>
-            <p class="info-val"><%= bus.busNumber %></p>
-          </div>
-          <div class="info-item">
-            <p class="info-label">Route Name</p>
-            <p class="info-val"><%= bus.routeName || 'N/A' %></p>
-          </div>
-          <div class="info-item">
-            <p class="info-label">Current Status</p>
-            <p class="info-val" style="text-transform: capitalize;"><%= bus.status || 'Active' %></p>
-          </div>
-          <div class="info-item">
-            <p class="info-label">Driver Name</p>
-            <p class="info-val"><%= bus.driverName || 'N/A' %></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="card eta-box">
-        <p class="info-label">Estimated Arrival</p>
-        <div class="eta-val" id="eta-time">-- mins</div>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn-secondary" onclick="location.reload()"><i class="fas fa-rotate"></i> Refresh</button>
-        <button class="btn-secondary" onclick="reportIssue()" style="color: #dc2626; border-color: #fee2e2;"><i class="fas fa-circle-exclamation"></i> Report</button>
-      </div>
-
-      <input type="hidden" id="bus-id" value="<%= bus.busId %>">
-      <div id="bus-data" data-lat="<%= bus.latitude %>" data-lng="<%= bus.longitude %>" style="display:none;"></div>
-
-    <% } else { %>
-      <div class="card" style="text-align:center; padding: 60px 20px;">
-        <i class="fas fa-bus-slash" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 20px;"></i>
-        <h3>No Assigned Bus</h3>
-        <p style="color: var(--text-muted); margin-top: 10px;">Contact the AIDS Department for assistance.</p>
-      </div>
-    <% } %>
-  </div>
-
-  <script>
-    let map, busMarker, studentMarker, routeLine;
-    let busData = {};
-    let studentPosition = null;
-    let routePathVisible = false;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const el = document.getElementById('bus-data');
-      if (el) {
-        busData = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) };
-        
-        map = L.map('map', { zoomControl: false }).setView([busData.lat, busData.lng], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        busMarker = L.marker([busData.lat, busData.lng], {
-            icon: L.divIcon({
-                html: '<div style="background:#2563eb; color:white; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.2);"><i class="fas fa-bus" style="font-size:14px;"></i></div>',
-                className: '', iconSize: [34, 34]
-            })
-        }).addTo(map);
-
-        getUserLocation();
-        setupLiveTracking();
-      }
-    });
-
-    function toggleFullScreen() {
-      const wrapper = document.getElementById('mapWrapper');
-      const icon = document.getElementById('fsIcon');
-      wrapper.classList.toggle('fullscreen');
-      icon.classList.toggle('fa-expand');
-      icon.classList.toggle('fa-compress');
-      setTimeout(() => map.invalidateSize(), 400);
-    }
-
-    function getUserLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          studentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          studentMarker = L.circleMarker([studentPosition.lat, studentPosition.lng], {
-            radius: 7, color: '#fff', weight: 2, opacity: 1, fillOpacity: 1, fillColor: '#10b981'
-          }).addTo(map);
-          updateETA();
-        }, null, { enableHighAccuracy: true });
-      }
-    }
-
-    function locateBus() { map.panTo(busMarker.getLatLng()); busMarker.openPopup(); }
-    function locateStudent() { if(studentPosition) map.panTo([studentPosition.lat, studentPosition.lng]); }
-
-    function toggleRoutePath() {
-      const text = document.getElementById('path-text');
-      if (!routePathVisible && studentPosition) {
-        routeLine = L.polyline([busMarker.getLatLng(), [studentPosition.lat, studentPosition.lng]], {
-          color: '#2563eb', weight: 4, dashArray: '10, 10', opacity: 0.6
-        }).addTo(map);
-        text.innerText = "Hide Route Path";
-        routePathVisible = true;
-        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-      } else if (routeLine) {
-        map.removeLayer(routeLine);
-        text.innerText = "Show Route Path";
-        routePathVisible = false;
-      }
-    }
-
-    function updateETA() {
-        if (!studentPosition) return;
-        const dist = map.distance(busMarker.getLatLng(), [studentPosition.lat, studentPosition.lng]);
-        const mins = Math.round((dist / 1000) / 0.4); // Approx 25km/h city speed
-        document.getElementById('eta-time').innerText = mins > 0 ? mins + " mins" : "Arriving Now";
-    }
-
-    function reportIssue() {
-        const msg = prompt("Describe the issue:");
-        if(msg) alert("Issue reported to AIDS Department. Thank you.");
-    }
-
-    function setupLiveTracking() {
-        const socket = io();
-        const busId = document.getElementById('bus-id')?.value;
-        if (!busId) return;
-        socket.on('connect', () => socket.emit('join-bus-room', busId));
-        socket.on('bus-location-update', (data) => {
-            if (data.latitude && data.longitude) {
-                const newPos = [data.latitude, data.longitude];
-                busMarker.setLatLng(newPos);
-                if (routePathVisible && routeLine) routeLine.setLatLngs([newPos, [studentPosition.lat, studentPosition.lng]]);
-                updateETA();
-            }
-        });
-    }
-  </script>
-</body>
-</html>
-
-
-============================================================
-FILE: controllers/busController.js
-============================================================
-
-const Bus = require('../models/Bus');
-
-exports.dashboard = async (req, res) => {
+exports.getLiveBuses = async (req, res) => {
   try {
-    // Get all buses to show on initial load
-    const buses = await Bus.find().sort({ updatedAt: -1 });
+    // Return buses with recent updates (last 5 minutes)
+    const result = await pool.query(
+      `SELECT * FROM buses 
+       WHERE status IN ('active', 'moving') 
+       AND updated_at > NOW() - INTERVAL '5 minutes'
+       ORDER BY updated_at DESC`
+    );
     
-    // Pass buses to the template
-    res.render('student/dashboard', { 
-      buses: buses 
+    res.json({
+      success: true,
+      buses: result.rows,
+      count: result.rows.length
     });
-    
   } catch (error) {
-    console.error("Dashboard error:", error);
-    res.status(500).send("Error loading student dashboard");
-  }
-};
-
-exports.getLocation = async (req, res) => {
-  try {
-    const buses = await Bus.find();
-    
-    const data = buses.map(bus => ({
-      busId: bus._id,
-      busNumber: bus.busNumber,
-      routeName: bus.routeName,
-      lat: bus.latitude,
-      lng: bus.longitude,
-      updatedAt: bus.updatedAt
-    }));
-    
-    res.json(data);
-  } catch (error) {
-    console.error("Get location error:", error);
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching live buses:', error);
+    // Fallback to all buses
+    return exports.getBuses(req, res);
   }
 };
 
 ============================================================
-FILE: controllers/driverController.js
+FILE: controllers\driverController.js
 ============================================================
 
 // server/controllers/driverController.js
@@ -1475,7 +1399,7 @@ exports.updateLiveLocation = async (req, res) => {
 };
 
 ============================================================
-FILE: controllers/studentController.js
+FILE: controllers\studentController.js
 ============================================================
 
 const Bus = require('../models/Bus');
@@ -1561,7 +1485,7 @@ exports.getRouteInfo = async (req, res) => {
 };
 
 ============================================================
-FILE: middleware/authMiddleware.js
+FILE: middleware\authMiddleware.js
 ============================================================
 
 // middleware/authMiddleware.js
@@ -1569,6 +1493,10 @@ FILE: middleware/authMiddleware.js
 // Check if user is authenticated
 exports.isAuthenticated = (req, res, next) => {
   if (!req.session.userId) {
+    // For API requests, return JSON
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     return res.redirect('/login');
   }
   next();
@@ -1577,10 +1505,16 @@ exports.isAuthenticated = (req, res, next) => {
 // Check if user is admin
 exports.isAdmin = (req, res, next) => {
   if (!req.session.userId) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     return res.redirect('/login');
   }
   
   if (req.session.role !== 'admin') {
+    if (req.path.startsWith('/api/')) {
+      return res.status(403).json({ success: false, message: 'Admin privileges required' });
+    }
     return res.status(403).render('error', {
       message: 'Access Denied',
       error: 'Admin privileges required'
@@ -1593,10 +1527,16 @@ exports.isAdmin = (req, res, next) => {
 // Check if user is driver
 exports.isDriver = (req, res, next) => {
   if (!req.session.userId) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     return res.redirect('/login');
   }
   
   if (req.session.role !== 'driver') {
+    if (req.path.startsWith('/api/')) {
+      return res.status(403).json({ success: false, message: 'Driver privileges required' });
+    }
     return res.status(403).render('error', {
       message: 'Access Denied',
       error: 'Driver privileges required'
@@ -1609,10 +1549,16 @@ exports.isDriver = (req, res, next) => {
 // Check if user is student
 exports.isStudent = (req, res, next) => {
   if (!req.session.userId) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     return res.redirect('/login');
   }
   
   if (req.session.role !== 'student') {
+    if (req.path.startsWith('/api/')) {
+      return res.status(403).json({ success: false, message: 'Student privileges required' });
+    }
     return res.status(403).render('error', {
       message: 'Access Denied',
       error: 'Student privileges required'
@@ -1639,7 +1585,7 @@ exports.getStudentBus = async (req, res, next) => {
 };
 
 ============================================================
-FILE: middleware/websocketMiddleware.js
+FILE: middleware\websocketMiddleware.js
 ============================================================
 
 // middleware/websocketMiddleware.js
@@ -1703,75 +1649,387 @@ module.exports = {
 };
 
 ============================================================
-FILE: models/Bus.js
+FILE: models\Bus.js
 ============================================================
 
-const mongoose = require('mongoose');
+const { pool } = require('../config/db');
 
-const busSchema = new mongoose.Schema({
-  busId: { 
-    type: String, 
-    unique: true, 
-    required: true 
-  },
-  busNumber: { 
-    type: String, 
-    required: true 
-  },
-  routeName: String,
-  driverName: String,
-  driverId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
-  },
-  capacity: Number,
-  currentPassengers: { type: Number, default: 0 },
-  latitude: Number,
-  longitude: Number,
-  speed: { type: Number, default: 0 },
-  status: { 
-    type: String, 
-    enum: ['moving', 'stopped', 'delayed', 'offline'],
-    default: 'moving' 
-  },
-  students: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  updatedAt: { type: Date, default: Date.now }
-});
+// Mock data logic (kept for fallback)
+const USE_MOCK_DB = process.env.USE_MOCK_DB === 'true';
+let mockBuses = []; 
 
-module.exports = mongoose.model('Bus', busSchema);
+class Bus {
+  // 1. Find all buses (Standard find)
+  static async find() {
+    if (USE_MOCK_DB) return mockBuses;
+
+    try {
+      const query = `
+        SELECT 
+          id,
+          bus_number as "busNumber",
+          route_name as "routeName",
+          capacity,
+          current_passengers as "currentPassengers",
+          status,
+          driver_id as "driverId",
+          latitude,
+          longitude,
+          updated_at as "updatedAt"
+        FROM buses 
+        ORDER BY bus_number
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error finding buses:', error);
+      throw error;
+    }
+  }
+
+  // 2. Find buses with Driver Info (THIS WAS MISSING)
+  static async findWithDrivers() {
+    if (USE_MOCK_DB) return mockBuses;
+
+    try {
+      // Joins buses with users to get driver name, utilizing aliases for frontend compatibility
+      const query = `
+        SELECT 
+          b.id,
+          b.bus_number as "busNumber",
+          b.route_name as "routeName",
+          b.capacity,
+          b.current_passengers as "currentPassengers",
+          b.status,
+          b.driver_id as "driverId",
+          b.latitude,
+          b.longitude,
+          b.updated_at as "updatedAt",
+          u.name as "driverName",
+          u.email as "driverEmail",
+          u.phone as "driverPhone"
+        FROM buses b
+        LEFT JOIN users u ON b.driver_id = u.id
+        ORDER BY b.updated_at DESC
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error finding buses with drivers:', error);
+      throw error;
+    }
+  }
+
+  // 3. Find bus by ID
+  static async findById(id) {
+    if (USE_MOCK_DB) return mockBuses.find(b => b.id === id);
+
+    try {
+      const query = `
+        SELECT 
+          id,
+          bus_number as "busNumber",
+          route_name as "routeName",
+          capacity,
+          current_passengers as "currentPassengers",
+          status,
+          driver_id as "driverId",
+          latitude,
+          longitude,
+          updated_at as "updatedAt"
+        FROM buses 
+        WHERE id = $1
+      `;
+      const result = await pool.query(query, [id]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error finding bus by ID:', error);
+      throw error;
+    }
+  }
+
+  // 4. Create new bus (Maps camelCase input -> snake_case DB columns)
+  static async create(busData) {
+    if (USE_MOCK_DB) return {}; // Mock implementation skipped for brevity
+
+    try {
+      const {
+        busNumber, routeName, driverId, capacity,
+        latitude = 20.5937, longitude = 78.9629, status = 'active'
+      } = busData;
+
+      const result = await pool.query(
+        `INSERT INTO buses 
+          (bus_number, route_name, driver_id, capacity, latitude, longitude, status, current_passengers)
+         VALUES 
+          ($1, $2, $3, $4, $5, $6, $7, 0)
+         RETURNING 
+          id,
+          bus_number as "busNumber",
+          route_name as "routeName",
+          capacity,
+          current_passengers as "currentPassengers",
+          status,
+          driver_id as "driverId",
+          latitude,
+          longitude`,
+        [busNumber, routeName, driverId || null, capacity, latitude, longitude, status]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating bus:', error);
+      throw error;
+    }
+  }
+
+  // 5. Update bus
+  static async findByIdAndUpdate(id, updateData) {
+    if (USE_MOCK_DB) return {}; 
+
+    try {
+      // Map Frontend camelCase to DB snake_case
+      const mapping = {
+        busNumber: 'bus_number',
+        routeName: 'route_name',
+        driverId: 'driver_id',
+        capacity: 'capacity',
+        status: 'status',
+        latitude: 'latitude',
+        longitude: 'longitude',
+        speed: 'speed'
+      };
+
+      const fields = [];
+      const values = [];
+      let i = 1;
+
+      for (const [key, value] of Object.entries(updateData)) {
+        if (mapping[key]) {
+          fields.push(`${mapping[key]} = $${i}`);
+          values.push(value);
+          i++;
+        }
+      }
+
+      if (fields.length === 0) return this.findById(id);
+
+      values.push(id);
+      
+      const query = `
+        UPDATE buses 
+        SET ${fields.join(', ')}, updated_at = NOW()
+        WHERE id = $${i}
+        RETURNING 
+          id,
+          bus_number as "busNumber",
+          route_name as "routeName",
+          capacity,
+          status,
+          driver_id as "driverId"
+      `;
+      
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating bus:', error);
+      throw error;
+    }
+  }
+
+  // 6. Delete bus
+  static async findByIdAndDelete(id) {
+    if (USE_MOCK_DB) return {}; 
+
+    try {
+      const result = await pool.query('DELETE FROM buses WHERE id = $1 RETURNING id', [id]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error deleting bus:', error);
+      throw error;
+    }
+  }
+
+  // 7. Update bus location
+  static async updateLocation(id, latitude, longitude) {
+    try {
+      const result = await pool.query(
+        `UPDATE buses 
+         SET latitude = $1, longitude = $2, updated_at = NOW()
+         WHERE id = $3 
+         RETURNING id, latitude, longitude`,
+        [latitude, longitude, id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating bus location:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = Bus;
 
 ============================================================
-FILE: models/User.js
+FILE: models\User.js
 ============================================================
 
-const mongoose = require('mongoose');
+const { pool } = require('../config/db');
+const { mockUserModel } = require('../utils/mockDatabase');
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { 
-    type: String, 
-    enum: ['student', 'driver', 'admin'], 
-    default: 'student' 
-  },
-  studentId: { 
-    type: String, 
-    unique: true, 
-    sparse: true
-  },
-  phone: String,
-  busAssigned: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Bus' 
-  },
-  createdAt: { type: Date, default: Date.now }
-});
+// Check if we should use mock database
+const USE_MOCK_DB = process.env.USE_MOCK_DB === 'true';
 
-module.exports = mongoose.model('User', userSchema);
+// User model functions for PostgreSQL
+class User {
+  // Find user by email
+  static async findByEmail(email) {
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error finding user by email:', error);
+      throw error;
+    }
+  }
+
+  // Find user by phone
+  static async findByPhone(phone) {
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error finding user by phone:', error);
+      throw error;
+    }
+  }
+
+  // Find user by ID
+  static async findById(id) {
+    if (USE_MOCK_DB) {
+      return mockUserModel.findById(id);
+    }
+
+    try {
+      // Ensure id is an integer for PostgreSQL
+      const userId = parseInt(id, 10);
+      if (isNaN(userId)) {
+        return null;
+      }
+      
+      const query = `
+        SELECT u.*, b.bus_number, b.route_name
+        FROM users u
+        LEFT JOIN buses b ON u.bus_assigned = b.id
+        WHERE u.id = $1
+      `;
+      
+      const result = await pool.query(query, [userId]);
+      const user = result.rows[0];
+
+      if (user && user.bus_assigned) {
+        user.busAssigned = {
+          id: user.bus_assigned,
+          busNumber: user.bus_number,
+          routeName: user.route_name
+        };
+      }
+
+      return user || null;
+    } catch (error) {
+      console.error('Error finding user by ID:', error);
+      throw error;
+    }
+  }
+
+  // Create new user
+  static async create(userData) {
+    if (USE_MOCK_DB) {
+      return mockUserModel.create(userData);
+    }
+
+    try {
+      const { name, email, password, role = 'student', studentId, phone, busAssigned } = userData;
+      const result = await pool.query(
+        `INSERT INTO users (name, email, password, role, student_id, phone, bus_assigned)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [name, email || null, password, role, studentId || null, phone || null, busAssigned || null]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  }
+
+  // Find all users
+  static async find(filter = {}) {
+    try {
+      let query = 'SELECT * FROM users';
+      const values = [];
+      const conditions = [];
+
+      if (filter.role) {
+        conditions.push(`role = $${values.length + 1}`);
+        values.push(filter.role);
+      }
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      const result = await pool.query(query, values);
+      return result.rows;
+    } catch (error) {
+      console.error('Error finding users:', error);
+      throw error;
+    }
+  }
+
+  // Update user by ID
+  static async findByIdAndUpdate(id, updateData) {
+    try {
+      const fields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      Object.keys(updateData).forEach(key => {
+        fields.push(`${key} = $${paramIndex}`);
+        values.push(updateData[key]);
+        paramIndex++;
+      });
+
+      values.push(id); // Add ID at the end
+
+      const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+      const result = await pool.query(query, values);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  }
+
+  // Delete user by ID
+  static async findByIdAndDelete(id) {
+    if (USE_MOCK_DB) {
+      return mockUserModel.findByIdAndDelete(id);
+    }
+
+    try {
+      const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = User;
+
 
 ============================================================
 FILE: package.json
@@ -1793,14 +2051,12 @@ FILE: package.json
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
-    "connect-mongo": "^6.0.0",
     "dotenv": "^17.2.3",
     "ejs": "^4.0.1",
     "express": "^5.2.1",
     "express-session": "^1.18.2",
     "geolib": "^3.3.4",
-    "mongodb-memory-server": "^11.0.1",
-    "mongoose": "^9.1.4",
+    "pg": "^8.17.2",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
@@ -1810,7 +2066,7 @@ FILE: package.json
 
 
 ============================================================
-FILE: public/css/admin.css
+FILE: public\css\admin.css
 ============================================================
 
 /* public/css/admin.css */
@@ -2197,7 +2453,7 @@ FILE: public/css/admin.css
 }
 
 ============================================================
-FILE: public/css/style.css
+FILE: public\css\style.css
 ============================================================
 
 /* Driver Dashboard Styles */
@@ -2283,7 +2539,7 @@ FILE: public/css/style.css
 }
 
 ============================================================
-FILE: public/js/admin.js
+FILE: public\js\admin.js
 ============================================================
 
 // public/js/admin.js
@@ -2763,7 +3019,7 @@ function logout() {
 }
 
 ============================================================
-FILE: public/js/driver-live.js
+FILE: public\js\driver-live.js
 ============================================================
 
 // public/js/driver-live.js
@@ -2819,13 +3075,13 @@ document.getElementById('start-tracking').addEventListener('click', startTrackin
 
 
 ============================================================
-FILE: public/js/driver.js
+FILE: public\js\driver.js
 ============================================================
 
 
 
 ============================================================
-FILE: public/js/map.js
+FILE: public\js\map.js
 ============================================================
 
 const map = L.map("map").setView([12.9716, 77.5946], 13);
@@ -2876,7 +3132,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 ============================================================
-FILE: public/js/student-map.js
+FILE: public\js\student-map.js
 ============================================================
 
 console.log('🚌 student-map.js loaded');
@@ -3263,7 +3519,7 @@ function setupSocketIO() {
 window.toggleRoutePath = toggleRoutePath;
 
 ============================================================
-FILE: public/js/student.js
+FILE: public\js\student.js
 ============================================================
 
 // Initialize map centered on India
@@ -3404,268 +3660,130 @@ function updateBusCard(bus) {
 setInterval(fetchBuses, 10000);
 
 ============================================================
-FILE: routes/adminRoutes.js
+FILE: routes\adminRoutes.js
 ============================================================
 
-// routes/adminRoutes.js - UPDATED VERSION
+// routes/adminRoutes.js
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const busController = require('../controllers/busController');
 const { isAuthenticated, isAdmin } = require('../middleware/authMiddleware');
+const { pool } = require('../config/db');
 
 // Apply admin middleware to all routes
 router.use(isAuthenticated);
 router.use(isAdmin);
 
-// Dashboard
+// ========== DASHBOARD ==========
 router.get('/dashboard', adminController.dashboard);
 
-// User Management
-router.get('/users', adminController.getUsers);
-router.post('/users', adminController.createUser);
-router.put('/users/:id', adminController.updateUser);
-router.delete('/users/:id', adminController.deleteUser);
-// In routes/adminRoutes.js - Add this route
-router.post('/users', async (req, res) => {
+// ========== USER MANAGEMENT ==========
+router.get('/users', adminController.getUsers);                // GET all users
+router.get('/users/:id', adminController.getUser);             // GET single user
+router.post('/users', adminController.createUser);             // CREATE user
+router.put('/users/:id', adminController.updateUser);          // UPDATE user
+router.delete('/users/:id', adminController.deleteUser);       // DELETE user
+router.post('/users/bulk-import', adminController.bulkImport); // BULK import
+
+// ========== BUS MANAGEMENT ==========
+// Consolidating bus management to use busController for consistency and security.
+router.get('/buses', busController.getBuses);
+router.get('/buses/:id', busController.getBus);
+router.post('/buses', busController.createBus);
+router.put('/buses/:id', busController.updateBus);
+router.delete('/buses/:id', busController.deleteBus);
+router.post('/buses/:id/location', busController.updateBusLocation);
+
+// ========== ROUTE MANAGEMENT ==========
+router.get('/routes', adminController.getRoutes);          // GET all routes
+router.post('/routes', adminController.createRoute);       // CREATE route
+router.get('/routes/:id', adminController.getRoute);       // GET single route
+router.put('/routes/:id', adminController.updateRoute);    // UPDATE route
+router.delete('/routes/:id', adminController.deleteRoute); // DELETE route
+
+// ========== DRIVER MANAGEMENT ==========
+router.get('/drivers/available', busController.getAvailableDrivers);
+
+// Add this to your server.js or adminRoutes.js for testing
+router.get('/test-db', async (req, res) => {
   try {
-    const result = await adminController.createUser(req, res);
+    // Test database connection
+    const dbTest = await pool.query('SELECT NOW() as time');
     
-    // If success, redirect
-    if (result.success) {
-      return res.redirect('/admin/users?success=User+created+successfully');
-    }
+    // Test buses table
+    const busesCount = await pool.query('SELECT COUNT(*) FROM buses');
     
-    // If error, render form with data
-    const users = await User.find().select('-password');
-    res.render('admin/users', {
-      title: 'User Management',
-      user: req.session,
-      users,
-      currentRole: 'all',
-      search: '',
-      userData: result.formData, // Pass form data back
-      error: result.message
+    // Test routes table
+    const routesCount = await pool.query('SELECT COUNT(*) FROM routes');
+    
+    // Test users table
+    const usersCount = await pool.query('SELECT COUNT(*) FROM users');
+    
+    res.json({
+      success: true,
+      database: {
+        connected: true,
+        time: dbTest.rows[0].time
+      },
+      tables: {
+        buses: parseInt(busesCount.rows[0].count),
+        routes: parseInt(routesCount.rows[0].count),
+        users: parseInt(usersCount.rows[0].count)
+      }
     });
-    
   } catch (error) {
-    console.error('Create user route error:', error);
-    res.redirect('/admin/users?error=' + encodeURIComponent(error.message));
+    res.status(500).json({
+      success: false,
+      message: 'Database error: ' + error.message
+    });
   }
 });
 
-// Bus Management
-router.get('/buses', adminController.getBuses);
-router.post('/buses', adminController.createBus);
-router.put('/buses/:id', adminController.updateBus);
-router.delete('/buses/:id', adminController.deleteBus);
-
-// Real-time Monitoring
-router.get('/monitor', adminController.monitor);
-
-// API endpoints
-router.get('/api/users/:id', adminController.getUser);
-router.get('/api/buses/:id', adminController.getBus);
-router.post('/api/buses/:id/location', adminController.updateBusLocation);
-router.get('/api/buses/live', adminController.getLiveBuses);
-router.get('/api/drivers', adminController.getAvailableDrivers);
-router.get('/api/buses', adminController.getAvailableBuses);
-router.get('/api/analytics/usage', adminController.getAnalytics);
-router.get('/api/export/:type', adminController.exportData);
-
-// Bulk operations
-router.post('/users/bulk-import', adminController.bulkImport);
 
 module.exports = router;
 
 ============================================================
-FILE: routes/authRoutes.js
+FILE: routes\authRoutes.js
 ============================================================
 
 // server/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const Bus = require('../models/Bus');
-const bcrypt = require('bcryptjs');
+const authController = require('../controllers/authController');
 
-// Login - API endpoint
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    console.log('🔐 Login attempt for:', email);
-    
-    const user = await User.findOne({ email });
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-    
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-    
-    // Set session
-    req.session.userId = user._id;
-    req.session.role = user.role;
-    req.session.name = user.name;
-    req.session.email = user.email;
-    req.session.busAssigned = user.busAssigned;
-    
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        studentId: user.studentId,
-        phone: user.phone,
-        busAssigned: user.busAssigned
-      }
-    });
-    
-  } catch (error) {
-    console.error('💥 Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error occurred. Please try again.'
-    });
-  }
-});
-
-// Logout
-router.post('/logout', (req, res) => {
-  req.session.destroy();
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
-});
-
-// Check authentication status
-router.get('/check', (req, res) => {
-  if (req.session.userId) {
-    res.json({
-      authenticated: true,
-      user: {
-        id: req.session.userId,
-        name: req.session.name,
-        email: req.session.email,
-        role: req.session.role
-      }
-    });
-  } else {
-    res.json({
-      authenticated: false
-    });
-  }
-});
-
-// Create test accounts (for development only)
-router.post('/create-test-accounts', async (req, res) => {
-  try {
-    console.log('Creating test accounts...');
-    
-    // 1. Create a driver
-    const driver = await User.create({
-      name: 'John Driver',
-      email: 'driver@college.edu',
-      password: await bcrypt.hash('driver123', 10),
-      role: 'driver'
-    });
-    
-    // 2. Create a bus and assign to driver
-    const bus = await Bus.create({
-      busId: 'BUS_01',
-      busNumber: '01',
-      routeName: 'Main Campus Route',
-      driverName: driver.name,
-      driverId: driver._id,
-      latitude: 12.9716,
-      longitude: 77.5946,
-      status: 'moving',
-      capacity: 40
-    });
-    
-    // 3. Create a test student
-    const student = await User.create({
-      name: 'Test Student',
-      email: 'student@college.edu',
-      password: await bcrypt.hash('student123', 10),
-      studentId: 'STU001',
-      phone: '1234567890',
-      role: 'student',
-      busAssigned: bus._id
-    });
-    
-    // Add student to bus
-    bus.students.push(student._id);
-    await bus.save();
-    
-    res.json({
-      success: true,
-      accounts: {
-        driver: {
-          email: 'driver@college.edu',
-          password: 'driver123'
-        },
-        student: {
-          email: 'student@college.edu',
-          password: 'student123'
-        }
-      }
-    });
-    
-  } catch (error) {
-    console.error('Creation error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
+// Auth Routes
+router.post('/login', authController.login);
+router.post('/logout', authController.logout);
+router.get('/check', authController.checkAuth);
+router.post('/register', authController.register);
+router.post('/create-test-accounts', authController.createTestAccounts);
 
 module.exports = router;
 
 ============================================================
-FILE: routes/busRoutes.js
+FILE: routes\busRoutes.js
 ============================================================
 
-const router = require("express").Router();
-const Bus = require("../models/Bus"); // Add this import
+// routes/busRoutes.js
+const express = require('express');
+const router = express.Router();
+const busController = require('../controllers/busController');
 
-// Fix: Use busNumber instead of busId since your model doesn't have busId
-router.get("/location/:busNumber", async (req, res) => {
-  try {
-    const bus = await Bus.findOne({ busNumber: req.params.busNumber })
-      .sort({ updatedAt: -1 });
+// ========== PUBLIC ROUTES ==========
+// These endpoints are for public consumption (e.g., by students or a public map)
+// and do not require admin authentication.
+router.get('/', busController.getBuses);
+router.get('/live', busController.getLiveBuses);
+router.get('/:id', busController.getBus);
 
-    if (!bus) {
-      return res.status(404).json({ 
-        error: `Bus ${req.params.busNumber} not found` 
-      });
-    }
-
-    res.json(bus);
-
-  } catch (error) {
-    console.error("Bus location error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// Note: All Create, Update, and Delete (CUD) operations for buses are handled
+// in /routes/adminRoutes.js to ensure they are protected by admin authentication.
 
 module.exports = router;
 
 ============================================================
-FILE: routes/driverRoutes.js
+FILE: routes\driverRoutes.js
 ============================================================
 
 // server/routes/driverRoutes.js
@@ -3685,7 +3803,7 @@ router.post('/update-live-location', driverController.updateLiveLocation);
 module.exports = router;
 
 ============================================================
-FILE: routes/studentRoutes.js
+FILE: routes\studentRoutes.js
 ============================================================
 
 const router = require('express').Router();
@@ -3710,117 +3828,247 @@ const http = require('http');
 const socketIo = require('socket.io');
 const dotenv = require('dotenv');
 const session = require('express-session');
-const connectDB = require('./config/db');
-const Bus = require('./models/Bus');
 const path = require('path');
 const cors = require('cors');
 
+// Load environment variables FIRST
 dotenv.config();
+
+// Database connection
+const connectDB = require('./config/db');
+const initDatabase = require('./utils/initDatabase');
+
+// Connect to PostgreSQL
 connectDB();
 
+// Initialize database schema
+(async () => {
+  try {
+    await initDatabase();
+    console.log('✅ Database initialization complete');
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error.message);
+  }
+})();
+
+// Create Express app
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS for Socket.io
+// In server.js, update socket.io configuration:
 const io = socketIo(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
-// Middleware
+// ========== MIDDLEWARE ==========
+// CORS middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// Session middleware
+// Session middleware - FIXED SETTINGS
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bus-tracking-secret-key-123',
-  resave: false,
-  saveUninitialized: false,
+  resave: true,  // CHANGED FROM false
+  saveUninitialized: true,  // CHANGED FROM false
   cookie: { 
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production'
+    sameSite: 'lax',  // CHANGED FOR DEVELOPMENT
+    secure: false  // CHANGED FOR DEVELOPMENT
   }
 }));
 
 // Make io accessible in controllers
 app.set('io', io);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// API Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/driver', require('./routes/driverRoutes'));
-app.use('/api/student', require('./routes/studentRoutes'));
-app.use('/api/bus', require('./routes/busRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
+// ========== TEMPORARY TEST ENDPOINTS ==========
+// Add these BEFORE importing routes
+app.get('/api/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is working!',
+    session: req.session ? 'Session exists' : 'No session',
+    sessionId: req.sessionID,
+    timestamp: new Date()
+  });
+});
 
-// Socket.io
+app.post('/api/test-login', (req, res) => {
+  const { email, password } = req.body;
+  
+  console.log('🔐 Test login attempt:', email);
+  
+  // Accept any email with password 'admin123' for testing
+  if (password === 'admin123') {
+    const role = email.includes('admin') ? 'admin' : 
+                 email.includes('driver') ? 'driver' : 'student';
+    
+    req.session.userId = 'test-user-' + Date.now();
+    req.session.role = role;
+    req.session.name = role.charAt(0).toUpperCase() + role.slice(1) + ' User';
+    req.session.email = email;
+    req.session.busAssigned = null;
+    
+    console.log('✅ Test login successful:', { email, role, sessionId: req.sessionID });
+    
+    return res.json({
+      success: true,
+      user: {
+        id: req.session.userId,
+        name: req.session.name,
+        email: email,
+        role: role,
+        studentId: role === 'student' ? 'STU001' : null
+      }
+    });
+  }
+  
+  res.status(401).json({
+    success: false,
+    message: 'Invalid credentials'
+  });
+});
+
+app.get('/api/test-check', (req, res) => {
+  res.json({
+    authenticated: !!req.session.userId,
+    session: req.session,
+    sessionId: req.sessionID,
+    timestamp: new Date()
+  });
+});
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const driverRoutes = require('./routes/driverRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const busRoutes = require('./routes/busRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+
+// ========== API ROUTES ==========
+// API documentation at root
+app.get('/api', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Bus Tracking System API',
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      admin: '/api/admin',
+      bus: '/api/bus',
+      driver: '/api/driver',
+      student: '/api/student',
+      test: '/api/test',
+      'test-login': '/api/test-login'
+    }
+  });
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    database: 'Connected',
+    sessionSupport: true
+  });
+});
+
+// Mount routes
+app.use('/api/auth', authRoutes);
+app.use('/api/driver', driverRoutes);
+app.use('/api/student', studentRoutes);
+app.use('/api/buses', busRoutes);
+app.use('/api/admin', adminRoutes);
+
+// ========== SOCKET.IO ==========
 io.on('connection', (socket) => {
-  console.log('🔌 Client connected via Socket.io');
+  console.log('🔌 Client connected via Socket.io - ID:', socket.id);
+  
+  // Heartbeat for connection monitoring
+  socket.emit('connected', { 
+    message: 'Connected to WebSocket server',
+    socketId: socket.id,
+    timestamp: new Date()
+  });
   
   // Join driver room
   socket.on('join-driver-room', (driverId) => {
-    socket.join(`driver-${driverId}`);
-    console.log(`👨‍✈️ Driver ${driverId} connected`);
-    
-    socket.emit('driver-connected', {
-      message: 'Driver dashboard connected',
-      timestamp: new Date()
-    });
+    if (driverId) {
+      socket.join(`driver-${driverId}`);
+      console.log(`👨‍✈️ Driver ${driverId} connected to room driver-${driverId}`);
+      
+      socket.emit('driver-connected', {
+        success: true,
+        message: 'Driver dashboard connected',
+        driverId: driverId,
+        timestamp: new Date()
+      });
+    }
   });
   
   // Join bus room
   socket.on('join-bus-room', (busId) => {
-    socket.join(`bus-${busId}`);
-    console.log(`🚌 Client joined bus room: ${busId}`);
-    
-    // Get initial bus data
-    Bus.findById(busId)
-      .then(bus => {
-        if (bus) {
-          socket.emit('bus-initial-data', bus);
-        }
-      })
-      .catch(err => console.error('Error getting bus data:', err));
+    if (busId) {
+      socket.join(`bus-${busId}`);
+      console.log(`🚌 Client joined bus room: bus-${busId}`);
+    }
   });
   
   // Handle live location updates from driver
   socket.on('driver-location-update', async (data) => {
-    const { busId, latitude, longitude, speed, status } = data;
-    
     try {
-      await Bus.findByIdAndUpdate(busId, {
-        latitude,
-        longitude,
-        speed,
-        status,
-        updatedAt: new Date()
-      });
+      const { busId, latitude, longitude, speed, status } = data;
+      
+      if (!busId) {
+        socket.emit('error', { message: 'Bus ID is required' });
+        return;
+      }
+      
+      console.log(`📍 Live update for bus ${busId}:`, { latitude, longitude, speed });
       
       // Broadcast to all students tracking this bus
       io.to(`bus-${busId}`).emit('bus-location-update', {
-        ...data,
+        success: true,
+        busId: busId,
+        latitude: latitude,
+        longitude: longitude,
+        speed: speed,
+        status: status,
         timestamp: new Date()
       });
       
-      console.log(`📍 Live update for bus ${busId}:`, {
-        lat: latitude,
-        lng: longitude,
-        speed: speed
-      });
     } catch (error) {
       console.error('Error updating bus location:', error);
+      socket.emit('error', { message: 'Failed to update location' });
     }
   });
   
   // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log('❌ Client disconnected');
+  socket.on('disconnect', (reason) => {
+    console.log(`❌ Client disconnected - ID: ${socket.id}, Reason: ${reason}`);
+  });
+  
+  // Error handling
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
   });
 });
 
@@ -3830,145 +4078,94 @@ setInterval(() => {
     timestamp: new Date(),
     activeConnections: io.engine.clientsCount
   });
-}, 30000);
+}, 30000); // Every 30 seconds
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false,
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
-  });
-});
-
-// 404 handler for API routes - FIXED THIS LINE
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ 
-    success: false,
-    message: 'API endpoint not found' 
-  });
-});
-
-// In production, serve React build
+// ========== STATIC FILES ==========
+// Serve static files from React app in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
   
+  // The "catchall" handler: for any request that doesn't match one above
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  });
+} else {
+  // Development mode - serve basic info
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Bus Tracking System API - Development Mode',
+      clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+      serverUrl: `http://localhost:${process.env.PORT || 5000}`,
+      apiDocs: 'Available at /api endpoint'
+    });
   });
 }
+
+// ========== ERROR HANDLERS ==========
+// 404 for API routes
+app.use('/api', (req, res, next) => {
+  if (req.path === '/api' || req.path === '/api/health' || req.path === '/api/test') {
+    return next();
+  }
+  res.status(404).json({
+    success: false,
+    message: 'API endpoint not found',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
+// General error handler
+app.use((err, req, res, next) => {
+  console.error('Server error:', err.stack);
+  
+  // Determine status code
+  const statusCode = err.status || 500;
+  
+  // Error response
+  const errorResponse = {
+    success: false,
+    message: err.message || 'Something went wrong!',
+    path: req.path,
+    method: req.method,
+    timestamp: new Date()
+  };
+  
+  // Add stack trace in development
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.stack = err.stack;
+  }
+  
+  res.status(statusCode).json(errorResponse);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`🔌 WebSocket server ready`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 CORS Origin: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+  console.log('\n📝 TEST ENDPOINTS:');
+  console.log(`   GET  http://localhost:${PORT}/api/test`);
+  console.log(`   POST http://localhost:${PORT}/api/test-login`);
+  console.log(`   GET  http://localhost:${PORT}/api/test-check`);
+  console.log('\n🔑 TEST CREDENTIALS:');
+  console.log('   Email: admin@college.edu / driver@college.edu / student@college.edu');
+  console.log('   Password: admin123 (for all)');
 });
 
 ============================================================
-FILE: setup.js
-============================================================
-
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-require('dotenv').config();
-
-async function setup() {
-  try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://root:root@airbnb.fzehhma.mongodb.net/bus_tracking');
-    console.log('✅ Connected to MongoDB');
-    
-    // Import models
-    const User = require('./models/User');
-    const Bus = require('./models/Bus');
-    
-    // Clear old data
-    await User.deleteMany({});
-    await Bus.deleteMany({});
-    console.log('🧹 Cleared old data');
-    
-    // 1. Create Admin
-    const admin = await User.create({
-      name: 'System Admin',
-      email: 'admin@college.edu',
-      password: await bcrypt.hash('admin123', 10),
-      role: 'admin'
-    });
-    console.log(`👑 Admin created: ${admin.email}`);
-    
-    // 2. Create Driver
-    const driver = await User.create({
-      name: 'John Driver',
-      email: 'driver@college.edu',
-      password: await bcrypt.hash('driver123', 10),
-      role: 'driver',
-      phone: '+1234567890'
-    });
-    console.log(`👨‍✈️ Driver created: ${driver.email}`);
-    
-    // 3. Create Bus and assign to driver
-    const bus = await Bus.create({
-      busId: 'BUS_01',
-      busNumber: '01',
-      routeName: 'Main Campus Route',
-      driverName: driver.name,
-      driverId: driver._id,
-      latitude: 12.9716,
-      longitude: 77.5946,
-      status: 'moving',
-      capacity: 40
-    });
-    console.log(`🚌 Bus created: ${bus.busNumber}`);
-    
-    // 4. Create Student
-    const student = await User.create({
-      name: 'Test Student',
-      email: 'student@college.edu',
-      password: await bcrypt.hash('student123', 10),
-      studentId: 'STU001',
-      phone: '+9876543210',
-      role: 'student',
-      busAssigned: bus._id
-    });
-    console.log(`👨‍🎓 Student created: ${student.email}`);
-    
-    // Add student to bus
-    bus.students.push(student._id);
-    await bus.save();
-    
-    console.log('\n🎉 SETUP COMPLETE!');
-    console.log('\n=== LOGIN CREDENTIALS ===');
-    console.log('ADMIN:');
-    console.log('  Email: admin@college.edu');
-    console.log('  Password: admin123');
-    console.log('  Role: admin');
-    console.log('\nDRIVER:');
-    console.log('  Email: driver@college.edu');
-    console.log('  Password: driver123');
-    console.log('  Role: driver');
-    console.log('\nSTUDENT:');
-    console.log('  Email: student@college.edu');
-    console.log('  Password: student123');
-    console.log('  Role: student');
-    console.log('\n=== NEXT STEPS ===');
-    console.log('1. Run server: npm run dev');
-    console.log('2. Open browser: http://localhost:3000');
-    console.log('3. Use test accounts to login');
-    
-    process.exit(0);
-    
-  } catch (error) {
-    console.error('❌ Setup failed:', error);
-    process.exit(1);
-  }
-}
-
-setup();
-
-============================================================
-FILE: utils/eta.js
+FILE: utils\eta.js
 ============================================================
 
 module.exports = function calculateETA(busLat, busLng, collegeLat, collegeLng) {
@@ -3983,7 +4180,7 @@ module.exports = function calculateETA(busLat, busLng, collegeLat, collegeLng) {
 };
 
 ============================================================
-FILE: utils/gpsSimulator.js
+FILE: utils\gpsSimulator.js
 ============================================================
 
 let lat = 9.918660;
@@ -4003,7 +4200,362 @@ setInterval(async () => {
 }, 3000);
 
 ============================================================
-FILE: utils/routeCalculator.js
+FILE: utils\initDatabase.js
+============================================================
+
+// server/utils/initDatabase.js
+const { pool } = require('../config/db');
+
+const initDatabase = async () => {
+  try {
+    console.log('📊 Initializing database schema...');
+
+    // Create users table if it doesn't exist
+    const createUsersTable = `
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'student',
+        student_id VARCHAR(50),
+        phone VARCHAR(20) UNIQUE,
+        bus_assigned INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await pool.query(createUsersTable);
+    console.log('✅ Users table initialized');
+
+    // MIGRATION: Alter email to be nullable if it isn't already
+    try {
+      await pool.query('ALTER TABLE users ALTER COLUMN email DROP NOT NULL');
+      console.log('✅ Schema updated: email is now nullable');
+    } catch (error) {
+      // Ignore if already nullable or other minor errors
+    }
+
+    // MIGRATION: Ensure phone is unique
+    try {
+      await pool.query('ALTER TABLE users ADD CONSTRAINT users_phone_key UNIQUE (phone)');
+      console.log('✅ Schema updated: phone is now unique');
+    } catch (error) {
+      if (error.code !== '42710') { // 42710 = constraint already exists
+        console.log('ℹ️ Phone constraint check:', error.message);
+      }
+    }
+
+    // Add created_at column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      `);
+      console.log('✅ Added created_at column to users table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        // 42701 = column already exists, which is fine
+        throw error;
+      }
+    }
+
+    // Add updated_at column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      `);
+      console.log('✅ Added updated_at column to users table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Create buses table if it doesn't exist
+    const createBusesTable = `
+      CREATE TABLE IF NOT EXISTS buses (
+        id SERIAL PRIMARY KEY,
+        bus_number VARCHAR(50) UNIQUE NOT NULL,
+        route_name VARCHAR(255),
+        capacity INTEGER,
+        current_passengers INTEGER DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'inactive',
+        driver_id INTEGER,
+        latitude DECIMAL(10, 8),
+        longitude DECIMAL(11, 8),
+        speed DECIMAL(5, 2) DEFAULT 0,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await pool.query(createBusesTable);
+    console.log('✅ Buses table initialized');
+
+    // Add created_at column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE buses ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      `);
+      console.log('✅ Added created_at column to buses table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Add updated_at column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE buses ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      `);
+      console.log('✅ Added updated_at column to buses table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Add route_stops column if it doesn't exist (for storing route stops as JSON)
+    try {
+      await pool.query(`
+        ALTER TABLE buses ADD COLUMN route_stops TEXT;
+      `);
+      console.log('✅ Added route_stops column to buses table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Add route_description column if it doesn't exist
+    try {
+      await pool.query(`
+        ALTER TABLE buses ADD COLUMN route_description TEXT;
+      `);
+      console.log('✅ Added route_description column to buses table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Add speed column if it doesn't exist
+    try {
+      await pool.query(`
+        ALTER TABLE buses ADD COLUMN speed DECIMAL(5, 2) DEFAULT 0;
+      `);
+      console.log('✅ Added speed column to buses table');
+    } catch (error) {
+      if (error.code !== '42701') {
+        throw error;
+      }
+    }
+
+    // Create routes table if it doesn't exist
+    const createRoutesTable = `
+      CREATE TABLE IF NOT EXISTS routes (
+        id SERIAL PRIMARY KEY,
+        route_name VARCHAR(255) NOT NULL,
+        route_number VARCHAR(50) UNIQUE,
+        starting_point VARCHAR(255) NOT NULL,
+        destination_point VARCHAR(255) NOT NULL,
+        stops TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await pool.query(createRoutesTable);
+    console.log('✅ Routes table initialized');
+
+    // Create an index for faster lookups
+    try {
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      `);
+      console.log('✅ Database indexes created');
+    } catch (error) {
+      console.warn('⚠️ Index creation warning:', error.message);
+    }
+
+    console.log('✨ Database initialization complete!');
+    return true;
+  } catch (error) {
+    console.error('❌ Database initialization error:', error.message);
+    throw error;
+  }
+};
+
+module.exports = initDatabase;
+
+
+============================================================
+FILE: utils\mockDatabase.js
+============================================================
+
+// server/utils/mockDatabase.js
+class MockBusModel {
+  constructor() {
+    this.buses = [];
+    this.currentId = 1;
+  }
+
+  find(filter = {}) {
+    let result = [...this.buses];
+    
+    if (filter.busNumber) {
+      result = result.filter(bus => bus.bus_number === filter.busNumber);
+    }
+    
+    if (filter.status) {
+      result = result.filter(bus => bus.status === filter.status);
+    }
+    
+    return result;
+  }
+
+  findById(id) {
+    return this.buses.find(bus => bus.id === parseInt(id)) || null;
+  }
+
+  findOne(filter = {}) {
+    const buses = this.find(filter);
+    return buses.length > 0 ? buses[0] : null;
+  }
+
+  create(busData) {
+    const newBus = {
+      id: this.currentId++,
+      ...busData,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    this.buses.push(newBus);
+    return newBus;
+  }
+
+  findByIdAndUpdate(id, updateData) {
+    const index = this.buses.findIndex(bus => bus.id === parseInt(id));
+    if (index === -1) return null;
+    
+    const updatedBus = {
+      ...this.buses[index],
+      ...updateData,
+      updated_at: new Date()
+    };
+    this.buses[index] = updatedBus;
+    return updatedBus;
+  }
+
+  findByIdAndDelete(id) {
+    const index = this.buses.findIndex(bus => bus.id === parseInt(id));
+    if (index === -1) return null;
+    
+    const deletedBus = this.buses[index];
+    this.buses.splice(index, 1);
+    return deletedBus;
+  }
+}
+
+class MockUserModel {
+  constructor() {
+    this.users = [];
+    this.currentId = 1;
+  }
+
+  find(filter = {}) {
+    let result = [...this.users];
+    
+    if (filter.role) {
+      result = result.filter(user => user.role === filter.role);
+    }
+    
+    return result;
+  }
+
+  findById(id) {
+    return this.users.find(user => user.id === parseInt(id)) || null;
+  }
+
+  findByEmail(email) {
+    return this.users.find(user => user.email === email) || null;
+  }
+
+  create(userData) {
+    const newUser = {
+      id: this.currentId++,
+      ...userData,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    this.users.push(newUser);
+    return newUser;
+  }
+
+  findByIdAndUpdate(id, updateData) {
+    const index = this.users.findIndex(user => user.id === parseInt(id));
+    if (index === -1) return null;
+    
+    const updatedUser = {
+      ...this.users[index],
+      ...updateData,
+      updated_at: new Date()
+    };
+    this.users[index] = updatedUser;
+    return updatedUser;
+  }
+
+  findByIdAndDelete(id) {
+    const index = this.users.findIndex(user => user.id === parseInt(id));
+    if (index === -1) return null;
+    
+    const deletedUser = this.users[index];
+    this.users.splice(index, 1);
+    return deletedUser;
+  }
+}
+
+// Create instances
+const mockBusModel = new MockBusModel();
+const mockUserModel = new MockUserModel();
+
+// Add some initial mock data
+mockBusModel.create({
+  bus_number: 'BUS-001',
+  route_name: 'East Campus Route',
+  driver_id: null,
+  capacity: 40,
+  latitude: 12.9716,
+  longitude: 77.5946,
+  speed: 0,
+  status: 'active',
+  route_stops: JSON.stringify(['Stop A', 'Stop B', 'Stop C']),
+  route_description: 'Main east campus route'
+});
+
+mockBusModel.create({
+  bus_number: 'BUS-002',
+  route_name: 'West Campus Route',
+  driver_id: null,
+  capacity: 35,
+  latitude: 12.9352,
+  longitude: 77.6245,
+  speed: 0,
+  status: 'active',
+  route_stops: JSON.stringify(['Stop X', 'Stop Y', 'Stop Z']),
+  route_description: 'West campus shuttle'
+});
+
+module.exports = {
+  mockBusModel,
+  mockUserModel
+};
+
+============================================================
+FILE: utils\routeCalculator.js
 ============================================================
 
 const axios = require('axios');
@@ -4123,3 +4675,168 @@ class RouteCalculator {
 }
 
 module.exports = new RouteCalculator();
+
+============================================================
+FILE: utils\seedDatabase.js
+============================================================
+
+// server/utils/seedDatabase.js
+const bcrypt = require('bcryptjs');
+const { pool } = require('../config/db');
+
+const seedDatabase = async () => {
+  try {
+    // Check if users already exist
+    const userCheck = await pool.query('SELECT COUNT(*) FROM users');
+    const userCount = parseInt(userCheck.rows[0].count);
+    
+    if (userCount > 0) {
+      console.log('✅ Database already has users, skipping seed');
+      return;
+    }
+
+    console.log('🌱 Seeding database with sample data...');
+
+    // Create sample buses
+    const busData = [
+      {
+        busNumber: 'BUS-001',
+        route: 'Route A',
+        capacity: 50,
+        status: 'active',
+        latitude: 26.9124,
+        longitude: 75.8572
+      },
+      {
+        busNumber: 'BUS-002',
+        route: 'Route B',
+        capacity: 50,
+        status: 'active',
+        latitude: 26.9125,
+        longitude: 75.8573
+      },
+      {
+        busNumber: 'BUS-003',
+        route: 'Route C',
+        capacity: 50,
+        status: 'inactive',
+        latitude: 26.9123,
+        longitude: 75.8571
+      }
+    ];
+
+    const buses = [];
+    for (const bus of busData) {
+      const result = await pool.query(
+        `INSERT INTO buses (bus_number, route, capacity, status, latitude, longitude)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [bus.busNumber, bus.route, bus.capacity, bus.status, bus.latitude, bus.longitude]
+      );
+      buses.push(result.rows[0]);
+    }
+
+    // Hash passwords
+    const password = await bcrypt.hash('admin123', 10);
+    const driverPassword = await bcrypt.hash('driver123', 10);
+    const studentPassword = await bcrypt.hash('student123', 10);
+
+    // Create sample users
+    const userData = [
+      {
+        name: 'Admin User',
+        email: 'admin@college.edu',
+        password: password,
+        role: 'admin',
+        phone: '9999999999'
+      },
+      {
+        name: 'John Driver',
+        email: 'driver@college.edu',
+        password: driverPassword,
+        role: 'driver',
+        phone: '8888888888',
+        busAssigned: buses[0].id
+      },
+      {
+        name: 'Alice Student',
+        email: 'student@college.edu',
+        password: studentPassword,
+        role: 'student',
+        studentId: 'STU001',
+        phone: '7777777777',
+        busAssigned: buses[0].id
+      },
+      {
+        name: 'Bob Student',
+        email: 'bob@college.edu',
+        password: studentPassword,
+        role: 'student',
+        studentId: 'STU002',
+        phone: '7777777778',
+        busAssigned: buses[1].id
+      }
+    ];
+
+    const users = [];
+    for (const user of userData) {
+      const result = await pool.query(
+        `INSERT INTO users (name, email, password, role, student_id, phone, bus_assigned)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [user.name, user.email, user.password, user.role, user.studentId || null, user.phone, user.busAssigned || null]
+      );
+      users.push(result.rows[0]);
+    }
+
+    console.log('✅ Database seeding complete!');
+    console.log(`   📦 Created ${buses.length} buses`);
+    console.log(`   👥 Created ${users.length} users`);
+    console.log('\n📝 Test Credentials:');
+    console.log('   Admin: admin@college.edu / admin123');
+    console.log('   Driver: driver@college.edu / driver123');
+    console.log('   Student: student@college.edu / student123');
+
+  } catch (error) {
+    console.error('❌ Seeding error:', error.message);
+  }
+};
+
+module.exports = seedDatabase;
+
+
+============================================================
+FILE: utils\seedPostgresAdmin.js
+============================================================
+
+const { pool } = require('../config/db');
+const bcrypt = require('bcryptjs');
+
+async function seedAdmin() {
+  const name = 'Admin User';
+  const email = 'admin@college.edu';
+  const plainPassword = 'admin123';
+  const role = 'admin';
+
+  try {
+    // Check if admin already exists
+    const check = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (check.rows.length > 0) {
+      console.log('✅ Fixed Admin user already exists.');
+      return;
+    }
+
+    const hash = await bcrypt.hash(plainPassword, 10);
+    await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+      [name, email, hash, role]
+    );
+    console.log('✅ Fixed Admin user seeded successfully.');
+  } catch (err) {
+    console.error('Error seeding admin user:', err);
+  } finally {
+    await pool.end();
+  }
+}
+
+seedAdmin();

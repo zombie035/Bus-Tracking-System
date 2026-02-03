@@ -1,306 +1,274 @@
 // client/src/components/Admin/UserManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
-import Modal from '../UI/Modal';
 import UserForm from './UserForm';
+import BulkUserUpload from './BulkUserUpload';
+import Toast from '../UI/Toast'; // Assuming you have this component
+import Modal from '../UI/Modal'; // Assuming you have this component
 
 const UserManagement = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [bulkSelected, setBulkSelected] = useState([]);
+  const [modalType, setModalType] = useState(''); // 'single', 'bulk', or 'edit'
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetData, setResetData] = useState({ password: '', confirmPassword: '' });
+  const [userToReset, setUserToReset] = useState(null);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
-  }, [search, roleFilter]);
+  }, []);
+
+  const showToastMsg = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const params = {};
-      if (roleFilter !== 'all') params.role = roleFilter;
-      if (search) params.search = search;
-      
-      const response = await userService.getAllUsers(params);
-      setUsers(response.users || []);
+      const response = await userService.getAllUsers();
+      if (response.success) {
+        setUsers(response.users || []);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
+      showToastMsg('Failed to fetch users', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddUser = () => {
-    setEditingUser(null);
+  const handleAddUserClick = () => {
+    setSelectedUser(null);
+    setModalType('single');
     setShowModal(true);
   };
 
-  const handleEditUser = (user) => {
-    setEditingUser(user);
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setModalType('edit');
     setShowModal(true);
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to delete user: ${userName}?`)) {
-      return;
-    }
+  const handleResetClick = (user) => {
+    setUserToReset(user);
+    setResetData({ password: '', confirmPassword: '' });
+    setShowResetPassword(false);
+    setResetModalOpen(true);
+  };
+
+  const handleDeleteClick = (user) => {
+    setDeleteConfirm(user);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
 
     try {
-      await userService.deleteUser(userId);
-      fetchUsers(); // Refresh list
+      const userId = deleteConfirm.id || deleteConfirm._id;
+      const response = await userService.deleteUser(userId);
+
+      if (response.success || response.message === 'User deleted successfully') {
+        showToastMsg('User deleted successfully');
+        setDeleteConfirm(null);
+        fetchUsers();
+      } else {
+        showToastMsg(response.message || 'Error deleting user', 'error');
+      }
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Failed to delete user');
+      showToastMsg('Failed to delete user', 'error');
     }
   };
 
-  const handleBulkSelect = (userId) => {
-    setBulkSelected(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+  const handleModalClose = () => {
+    setShowModal(false);
+    setModalType('');
+    setSelectedUser(null);
   };
 
-  const handleBulkDelete = async () => {
-    if (bulkSelected.length === 0) {
-      alert('Please select users to delete');
+  const handleUserSuccess = () => {
+    setShowModal(false);
+    setModalType('');
+    setSelectedUser(null);
+    fetchUsers(); // Refresh the list
+    showToastMsg(selectedUser ? 'User updated successfully' : 'User created successfully');
+  };
+
+  const handleResetSubmit = async () => {
+    if (resetData.password !== resetData.confirmPassword) {
+      showToastMsg('Passwords do not match', 'error');
       return;
     }
-
-    if (!window.confirm(`Are you sure you want to delete ${bulkSelected.length} users?`)) {
+    if (resetData.password.length < 6) {
+      showToastMsg('Password must be at least 6 characters', 'error');
       return;
     }
 
     try {
-      // Delete in parallel
-      await Promise.all(bulkSelected.map(id => userService.deleteUser(id)));
-      setBulkSelected([]);
-      fetchUsers();
+      const response = await userService.resetPassword(userToReset.id || userToReset._id, resetData.password);
+      if (response.success) {
+        showToastMsg('Password reset successfully');
+        setResetModalOpen(false);
+        setUserToReset(null);
+      } else {
+        showToastMsg(response.message || 'Failed to reset password', 'error');
+      }
     } catch (error) {
-      console.error('Error in bulk delete:', error);
-      alert('Failed to delete users');
+      console.error('Error resetting password:', error);
+      showToastMsg(error.message || 'Failed to reset password', 'error');
     }
   };
 
-  const getRoleBadgeClass = (role) => {
-    switch (role) {
-      case 'admin': return 'bg-purple-100 text-purple-800';
-      case 'driver': return 'bg-amber-100 text-amber-800';
-      case 'student': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
+  // Filtering Logic
   const filteredUsers = users.filter(user => {
-    const matchesSearch = !search || 
-      user.name?.toLowerCase().includes(search.toLowerCase()) ||
-      user.email?.toLowerCase().includes(search.toLowerCase()) ||
-      user.studentId?.toLowerCase().includes(search.toLowerCase());
-    
+    // Determine search match (check name, email, and phone)
+    const searchLower = searchTerm.toLowerCase();
+    const nameMatch = user.name?.toLowerCase().includes(searchLower);
+    const emailMatch = user.email?.toLowerCase().includes(searchLower);
+    const phoneMatch = user.phone?.includes(searchLower);
+
+    const matchesSearch = nameMatch || emailMatch || phoneMatch;
+
+    // Determine role match
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    
+
     return matchesSearch && matchesRole;
   });
 
   return (
-    <div>
+    <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-            <p className="text-gray-600 mt-2">
-              Manage all system users (students, drivers, admins)
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleAddUser}
-              className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all flex items-center gap-2"
-            >
-              <i className="fas fa-user-plus"></i>
-              Add New User
-            </button>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage students, drivers, and admins</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleAddUserClick}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <i className="fas fa-plus"></i> Add User
+          </button>
+          <button
+            onClick={() => { setModalType('bulk'); setShowModal(true); }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <i className="fas fa-file-upload"></i> Bulk Import
+          </button>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i className="fas fa-search text-gray-400"></i>
-              </div>
-              <input
-                type="text"
-                placeholder="Search users by name, email, or ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 relative">
+            <i className="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
+            <input
+              type="text"
+              placeholder="Search by name, email or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-6 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+            />
           </div>
-          
-          <div className="w-full md:w-auto">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Roles</option>
-              <option value="student">Students</option>
-              <option value="driver">Drivers</option>
-              <option value="admin">Admins</option>
-            </select>
-          </div>
-          
-          {bulkSelected.length > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-semibold hover:from-red-600 hover:to-red-700 transition-all flex items-center gap-2"
-            >
-              <i className="fas fa-trash"></i>
-              Delete Selected ({bulkSelected.length})
-            </button>
-          )}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-base shadow-sm min-w-[200px]"
+          >
+            <option value="all">All Roles</option>
+            <option value="student">Students</option>
+            <option value="driver">Drivers</option>
+            <option value="admin">Admins</option>
+          </select>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading users...</p>
-            </div>
+          <div className="p-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-2 text-gray-500">Loading users...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 p-8">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <i className="fas fa-user-slash text-3xl text-gray-400"></i>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Users Found</h3>
-            <p className="text-gray-600 text-center">
-              {search || roleFilter !== 'all' 
-                ? 'No users match your search criteria'
-                : 'No users in the system yet'}
-            </p>
-            {!search && roleFilter === 'all' && (
-              <button
-                onClick={handleAddUser}
-                className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all"
-              >
-                Add Your First User
-              </button>
-            )}
+          <div className="p-12 text-center">
+            <p className="text-gray-500">No users found matching your criteria.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={bulkSelected.length === filteredUsers.length}
-                      onChange={() => {
-                        if (bulkSelected.length === filteredUsers.length) {
-                          setBulkSelected([]);
-                        } else {
-                          setBulkSelected(filteredUsers.map(u => u._id));
-                        }
-                      }}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student ID
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Phone
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name / Info</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bus Info</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={bulkSelected.includes(user._id)}
-                        onChange={() => handleBulkSelect(user._id)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={user.id || user._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
-                            {user.name?.charAt(0).toUpperCase()}
-                          </div>
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium">
+                          {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                          {user.studentId && (
+                            <div className="text-xs text-gray-500">ID: {user.studentId}</div>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
-                        {user.role}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'driver' ? 'bg-amber-100 text-amber-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                        {user.role.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.studentId || 'N/A'}
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">{user.email || '-'}</div>
+                      <div className="text-sm text-gray-500">{user.phone || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.phone || 'N/A'}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.busAssigned ? `Bus ${user.busAssigned}` : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edit"
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user._id, user.name)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEditClick(user)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
+                      <button
+                        onClick={() => handleResetClick(user)}
+                        className="text-amber-600 hover:text-amber-900 mr-4"
+                        title="Reset Password"
+                      >
+                        <i className="fas fa-key"></i>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(user)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -310,43 +278,107 @@ const UserManagement = () => {
         )}
       </div>
 
-      {/* Pagination (simplified) */}
-      {filteredUsers.length > 0 && (
-        <div className="mt-6 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            Showing <span className="font-medium">{filteredUsers.length}</span> users
+      {/* Main Modal (Add/Edit/Bulk) */}
+      <Modal
+        isOpen={showModal}
+        onClose={handleModalClose}
+        title={
+          modalType === 'bulk' ? 'Bulk Import Users' :
+            selectedUser ? 'Edit User' : 'Add New User'
+        }
+      >
+        {modalType === 'bulk' ? (
+          <BulkUserUpload onSuccess={handleUserSuccess} onCancel={handleModalClose} />
+        ) : (
+          <UserForm
+            user={selectedUser}
+            onSuccess={handleUserSuccess}
+            onCancel={handleModalClose}
+          />
+        )}
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        title={`Reset Password - ${userToReset?.name}`}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <div className="relative">
+              <input
+                type={showResetPassword ? "text" : "password"}
+                value={resetData.password}
+                onChange={(e) => setResetData({ ...resetData, password: e.target.value })}
+                className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter new password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowResetPassword(!showResetPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                <i className={`fas ${showResetPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Previous
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <input
+              type={showResetPassword ? "text" : "password"}
+              value={resetData.confirmPassword}
+              onChange={(e) => setResetData({ ...resetData, confirmPassword: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Confirm new password"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => setResetModalOpen(false)}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
             </button>
-            <button className="px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700">
-              1
-            </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              2
-            </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Next
+            <button
+              onClick={handleResetSubmit}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              Reset Password
             </button>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* User Modal */}
+      {/* Delete Confirmation Modal */}
       <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingUser ? 'Edit User' : 'Add New User'}
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        title="Confirm Delete"
+        size="sm"
       >
-        <UserForm
-          user={editingUser}
-          onSuccess={() => {
-            setShowModal(false);
-            fetchUsers();
-          }}
-          onCancel={() => setShowModal(false)}
-        />
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete <strong>{deleteConfirm?.name}</strong>?
+            This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setDeleteConfirm(null)}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Delete User
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

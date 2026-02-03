@@ -3,7 +3,7 @@
 // Check if user is authenticated
 exports.isAuthenticated = (req, res, next) => {
   if (!req.session.userId) {
-    return res.redirect('/login');
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   next();
 };
@@ -11,48 +11,42 @@ exports.isAuthenticated = (req, res, next) => {
 // Check if user is admin
 exports.isAdmin = (req, res, next) => {
   if (!req.session.userId) {
-    return res.redirect('/login');
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
-  
+
   if (req.session.role !== 'admin') {
-    return res.status(403).render('error', {
-      message: 'Access Denied',
-      error: 'Admin privileges required'
-    });
+    return res.status(403).json({ success: false, message: 'Admin privileges required' });
   }
-  
+
   next();
 };
 
-// Check if user is driver
+// Middleware to check if user is driver
 exports.isDriver = (req, res, next) => {
   if (!req.session.userId) {
-    return res.redirect('/login');
-  }
-  
-  if (req.session.role !== 'driver') {
-    return res.status(403).render('error', {
-      message: 'Access Denied',
-      error: 'Driver privileges required'
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized'
     });
   }
-  
+
+  if (req.session.role !== 'driver') {
+    return res.status(403).json({ success: false, message: 'Driver privileges required' });
+  }
+
   next();
 };
 
 // Check if user is student
 exports.isStudent = (req, res, next) => {
   if (!req.session.userId) {
-    return res.redirect('/login');
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
-  
+
   if (req.session.role !== 'student') {
-    return res.status(403).render('error', {
-      message: 'Access Denied',
-      error: 'Student privileges required'
-    });
+    return res.status(403).json({ success: false, message: 'Student privileges required' });
   }
-  
+
   next();
 };
 

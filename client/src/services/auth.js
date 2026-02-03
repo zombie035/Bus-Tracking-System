@@ -2,8 +2,9 @@
 import api from './api';
 
 export const authService = {
-  login: async (email, password) => {
-    const response = await api.post('/api/auth/login', { email, password });
+  // Updated to accept identifier (email or phone)
+  login: async (identifier, password) => {
+    const response = await api.post('/api/auth/login', { identifier, password });
     return response.data;
   },
 

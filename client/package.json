@@ -4,11 +4,16 @@
   "private": true,
   "dependencies": {
     "@craco/craco": "^7.1.0",
+    "@heroicons/react": "^2.2.0",
+    "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
     "axios": "^1.6.7",
     "chart.js": "^4.4.0",
+    "framer-motion": "^12.30.0",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
@@ -17,16 +22,18 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.21.1",
     "react-scripts": "5.0.1",
+    "react-toastify": "^11.0.5",
     "socket.io-client": "^4.7.3",
-    "web-vitals": "^3.5.0"
+    "web-vitals": "^3.5.0",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
-  "start": "craco start",
-  "build": "craco build",
-  "test": "craco test",
-  "eject": "react-scripts eject"
-},
-  "proxy": "http://localhost:5000",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "react-scripts eject"
+  },
+  "proxy": "http://127.0.0.1:5000",
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -46,6 +53,11 @@
     ]
   },
   "devDependencies": {
-    "cross-env": "^10.1.0"
+    "autoprefixer": "^10.4.23",
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.3.1",
+    "eslint-webpack-plugin": "^5.0.2",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.1"
   }
 }

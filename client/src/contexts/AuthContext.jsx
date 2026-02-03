@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get('/api/auth/check', {
         withCredentials: true
       });
-      
+
       if (response.data.authenticated) {
         setUser(response.data.user);
       }
@@ -32,23 +32,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    setError('');
+  const login = async (identifier, password) => {
     try {
+      setLoading(true);
+      console.log('🔐 Attempting login with identifier:', identifier);
       const response = await axios.post('/api/auth/login', {
-        email,
+        identifier, // Can be email or phone number
         password
-      }, {
-        withCredentials: true
       });
 
       if (response.data.success) {
         setUser(response.data.user);
-        return { success: true, role: response.data.user.role };
+        setError(null);
+        return {
+          success: true,
+          role: response.data.user.role
+        };
       }
-    } catch (error) {
-      setError(error.response?.data?.message || 'Login failed');
-      return { success: false, error: error.response?.data?.message };
+      return { success: false };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Login failed';
+      setError(message);
+      console.error('❌ Login error:', message);
+      return { success: false, message };
+    } finally {
+      setLoading(false);
     }
   };
 

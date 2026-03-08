@@ -6,8 +6,7 @@ const session = require('express-session');
 const path = require('path');
 const cors = require('cors');
 
-// Load environment variables FIRST
-// Load environment variables FIRST
+// Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Database connection
@@ -32,7 +31,6 @@ const app = express();
 const server = http.createServer(app);
 
 // Configure CORS for Socket.io
-// In server.js, update socket.io configuration:
 const io = socketIo(server, {
   cors: {
     origin: (origin, callback) => {
@@ -95,7 +93,6 @@ app.use('/api', limiter);
 // ========== STANDARD MIDDLEWARE ==========
 // CORS Middleware
 app.use(cors({
-  // ... existing cors config ...
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -142,66 +139,7 @@ app.use(session({
 // Make io accessible in controllers
 app.set('io', io);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== TEMPORARY TEST ENDPOINTS ==========
-// Add these BEFORE importing routes
-app.get('/api/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API is working!',
-    session: req.session ? 'Session exists' : 'No session',
-    sessionId: req.sessionID,
-    timestamp: new Date()
-  });
-});
-
-app.post('/api/test-login', (req, res) => {
-  const { email, password } = req.body;
-
-  console.log('🔐 Test login attempt:', email);
-
-  // Accept any email with password 'admin123' for testing
-  if (password === 'admin123') {
-    const role = email.includes('admin') ? 'admin' :
-      email.includes('driver') ? 'driver' : 'student';
-
-    req.session.userId = 'test-user-' + Date.now();
-    req.session.role = role;
-    req.session.name = role.charAt(0).toUpperCase() + role.slice(1) + ' User';
-    req.session.email = email;
-    req.session.busAssigned = null;
-
-    console.log('✅ Test login successful:', { email, role, sessionId: req.sessionID });
-
-    return res.json({
-      success: true,
-      user: {
-        id: req.session.userId,
-        name: req.session.name,
-        email: email,
-        role: role,
-        studentId: role === 'student' ? 'STU001' : null
-      }
-    });
-  }
-
-  res.status(401).json({
-    success: false,
-    message: 'Invalid credentials'
-  });
-});
-
-app.get('/api/test-check', (req, res) => {
-  res.json({
-    authenticated: !!req.session.userId,
-    session: req.session,
-    sessionId: req.sessionID,
-    timestamp: new Date()
-  });
-});
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -387,7 +325,7 @@ if (process.env.NODE_ENV === 'production') {
 // ========== ERROR HANDLERS ==========
 // 404 for API routes
 app.use('/api', (req, res, next) => {
-  if (req.path === '/api' || req.path === '/api/health' || req.path === '/api/test') {
+  if (req.path === '/api' || req.path === '/api/health') {
     return next();
   }
   res.status(404).json({
@@ -438,11 +376,4 @@ server.listen(PORT, () => {
   console.log(`🔌 WebSocket server ready`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 CORS Origin: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
-  console.log('\n📝 TEST ENDPOINTS:');
-  console.log(`   GET  http://localhost:${PORT}/api/test`);
-  console.log(`   POST http://localhost:${PORT}/api/test-login`);
-  console.log(`   GET  http://localhost:${PORT}/api/test-check`);
-  console.log('\n🔑 TEST CREDENTIALS:');
-  console.log('   Email: admin@college.edu / driver@college.edu / student@college.edu');
-  console.log('   Password: admin123 (for all)');
 });

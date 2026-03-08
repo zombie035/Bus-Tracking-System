@@ -19,7 +19,6 @@ const NotificationsPage = React.lazy(() => import('./pages/Student/Notifications
 const ProfilePage = React.lazy(() => import('./pages/Student/ProfilePage'));
 const SettingsPage = React.lazy(() => import('./pages/Student/SettingsPage'));
 const HelpPage = React.lazy(() => import('./pages/Student/HelpPage'));
-const TestAuth = React.lazy(() => import('./components/TestAuth'));
 
 // Import PrivateRoute (Essential for auth)
 import PrivateRoute from './components/Auth/PrivateRoute';
@@ -49,8 +48,6 @@ function App() {
                 <HomePage />
               </PrivateRoute>
             } />
-
-            <Route path="/test-auth" element={<TestAuth />} />
 
             <Route path="/admin/*" element={
               <PrivateRoute allowedRoles={['admin']}>

@@ -698,7 +698,8 @@ exports.getSettings = async (req, res) => {
         theme,
         notifications_enabled as "notificationsEnabled",
         sound_enabled as "soundEnabled",
-        auto_start_tracking as "autoStartTracking"
+        auto_start_tracking as "autoStartTracking",
+        layout_config as "layoutConfig"
       FROM driver_settings
       WHERE driver_id = $1
     `;
@@ -710,10 +711,19 @@ exports.getSettings = async (req, res) => {
         success: true,
         settings: {
           language: 'en',
-          theme: 'light',
+          theme: 'auto',
           notificationsEnabled: true,
           soundEnabled: true,
-          autoStartTracking: false
+          autoStartTracking: false,
+          layoutConfig: {
+            navbarPosition: "bottom",
+            navStyle: "icons-label",
+            density: "comfortable",
+            theme: "auto",
+            mapControls: "right",
+            bottomSheetDefault: "collapsed",
+            emergencyPosition: "top-right"
+          }
         }
       });
     }
@@ -732,23 +742,24 @@ exports.updateSettings = async (req, res) => {
     }
 
     const user = await User.findById(req.session.userId);
-    const { language, theme, notificationsEnabled, soundEnabled, autoStartTracking } = req.body;
+    const { language, theme, notificationsEnabled, soundEnabled, autoStartTracking, layoutConfig } = req.body;
 
     const upsertQuery = `
       INSERT INTO driver_settings (
-        driver_id, language, theme, notifications_enabled, sound_enabled, auto_start_tracking
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+        driver_id, language, theme, notifications_enabled, sound_enabled, auto_start_tracking, layout_config
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (driver_id) DO UPDATE SET
         language = EXCLUDED.language,
         theme = EXCLUDED.theme,
         notifications_enabled = EXCLUDED.notifications_enabled,
         sound_enabled = EXCLUDED.sound_enabled,
         auto_start_tracking = EXCLUDED.auto_start_tracking,
+        layout_config = EXCLUDED.layout_config,
         updated_at = NOW()
       RETURNING *
     `;
 
-    const values = [user.id, language, theme, notificationsEnabled, soundEnabled, autoStartTracking];
+    const values = [user.id, language, theme, notificationsEnabled, soundEnabled, autoStartTracking, JSON.stringify(layoutConfig)];
     const result = await pool.query(upsertQuery, values);
 
     res.json({ success: true, message: 'Settings updated successfully', settings: result.rows[0] });
@@ -774,21 +785,227 @@ exports.getBusDetails = async (req, res) => {
 
     res.json({
       success: true,
-      bus: {
-        id: myBus.id,
-        busNumber: myBus.busNumber,
-        routeName: myBus.routeName,
-        capacity: myBus.capacity,
-        status: myBus.status,
-        currentPassengers: myBus.currentPassengers,
-        latitude: myBus.latitude,
-        longitude: myBus.longitude,
-        tripStatus: myBus.trip_status || 'idle',
-        delayStatus: myBus.delay_status || false
-      }
+      bus: myBus
     });
   } catch (error) {
     console.error('Get bus details error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get bus details by driver name
+exports.getBusDetailsByDriverName = async (req, res) => {
+  try {
+    const { driverName } = req.params;
+    console.log('🔍 Fetching bus details for driver:', driverName);
+
+    // Find driver by name
+    const driverQuery = `
+      SELECT id, name, email, phone, license_number, experience, join_date, status
+      FROM users 
+      WHERE name = $1 AND role = 'driver'
+    `;
+    const driverResult = await pool.query(driverQuery, [decodeURIComponent(driverName)]);
+
+    if (driverResult.rows.length === 0) {
+      console.log('❌ Driver not found:', driverName);
+      return res.status(404).json({
+        success: false,
+        message: `Driver ${driverName} not found`
+      });
+    }
+
+    const driver = driverResult.rows[0];
+    console.log('✅ Found driver:', driver.name);
+
+    // Find bus assigned to this driver
+    const busQuery = `
+      SELECT b.*, r.route_name, r.stops as route_stops
+      FROM buses b
+      LEFT JOIN routes r ON b.route_name = r.route_name
+      WHERE b.driver_name = $1
+    `;
+    const busResult = await pool.query(busQuery, [driver.name]);
+
+    let busDetails = null;
+
+    if (busResult.rows.length > 0) {
+      const bus = busResult.rows[0];
+
+      // Get route stops count
+      let totalStops = 0;
+      if (bus.route_stops) {
+        try {
+          const stops = JSON.parse(bus.route_stops);
+          totalStops = stops.length;
+        } catch (e) {
+          // If JSON parse fails, try to get from route_stops table
+          const stopsQuery = `
+            SELECT COUNT(*) as count
+            FROM route_stops
+            WHERE route_name = $1
+          `;
+          const stopsResult = await pool.query(stopsQuery, [bus.route_name]);
+          totalStops = parseInt(stopsResult.rows[0]?.count || 0);
+        }
+      } else {
+        // Get stops from route_stops table
+        const stopsQuery = `
+          SELECT COUNT(*) as count
+          FROM route_stops
+          WHERE route_name = $1
+        `;
+        const stopsResult = await pool.query(stopsQuery, [bus.route_name]);
+        totalStops = parseInt(stopsResult.rows[0]?.count || 0);
+      }
+
+      busDetails = {
+        busNumber: bus.bus_number,
+        busType: bus.bus_type || 'Standard Bus',
+        capacity: bus.capacity || 50,
+        licensePlate: bus.license_plate || 'N/A',
+        routeName: bus.route_name || 'Unassigned',
+        totalStops: totalStops,
+        estimatedDuration: bus.estimated_duration || 45,
+        fuelLevel: bus.fuel_level || 75,
+        lastMaintenance: bus.last_maintenance || '2024-01-01',
+        nextMaintenance: bus.next_maintenance || '2024-02-01',
+        status: bus.status || 'Active',
+        driverAssigned: driver.name,
+        driverPhone: driver.phone,
+        driverLicense: driver.license_number
+      };
+    } else {
+      // Default bus details if no bus assigned
+      busDetails = {
+        busNumber: 'UNASSIGNED',
+        busType: 'N/A',
+        capacity: 0,
+        licensePlate: 'N/A',
+        routeName: 'No Route Assigned',
+        totalStops: 0,
+        estimatedDuration: 0,
+        fuelLevel: 0,
+        lastMaintenance: 'N/A',
+        nextMaintenance: 'N/A',
+        status: 'Unassigned',
+        driverAssigned: driver.name,
+        driverPhone: driver.phone,
+        driverLicense: driver.license_number
+      };
+    }
+
+    // Get driver statistics
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_trips,
+        AVG(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completion_rate,
+        MAX(created_at) as last_trip
+      FROM trips 
+      WHERE driver_id = $1
+    `;
+    const statsResult = await pool.query(statsQuery, [driver.id]);
+    const stats = statsResult.rows[0];
+
+    const driverInfo = {
+      id: driver.id,
+      name: driver.name,
+      email: driver.email,
+      phone: driver.phone,
+      licenseNumber: driver.license_number,
+      experience: driver.experience || 'Unknown',
+      joinDate: driver.join_date || 'Unknown',
+      status: driver.status,
+      totalTrips: parseInt(stats.total_trips) || 0,
+      completionRate: parseFloat(stats.completion_rate) || 0,
+      lastTrip: stats.last_trip || 'No trips yet'
+    };
+
+    console.log(`✅ Bus details retrieved for ${driver.name}:`, busDetails.busNumber);
+
+    res.json({
+      success: true,
+      busDetails,
+      driverInfo,
+      message: 'Bus details retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching bus details by driver name:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bus details',
+      error: error.message
+    });
+  }
+};
+
+// Get bus details by driver ID
+exports.getBusDetailsByDriverId = async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    console.log('🔍 Fetching bus details for driver ID:', driverId);
+
+    // Find bus assigned to this driver ID
+    const busQuery = `
+      SELECT b.*, r.route_name, r.stops as route_stops
+      FROM buses b
+      LEFT JOIN routes r ON b.route_name = r.route_name
+      WHERE b.driver_id = $1
+    `;
+    const busResult = await pool.query(busQuery, [driverId]);
+
+    if (busResult.rows.length === 0) {
+      console.log('❌ No bus found for driver ID:', driverId);
+      return res.status(404).json({
+        success: false,
+        message: `No bus assigned to driver ID ${driverId}`
+      });
+    }
+
+    const bus = busResult.rows[0];
+    console.log('✅ Found bus for driver ID:', driverId, 'Bus:', bus.bus_number);
+
+    // Get driver info
+    const driverQuery = `
+      SELECT id, name, email, phone, license_number, experience, join_date, status
+      FROM users 
+      WHERE id = $1 AND role = 'driver'
+    `;
+    const driverResult = await pool.query(driverQuery, [driverId]);
+
+    const driverInfo = driverResult.rows[0] || {};
+
+    const busDetails = {
+      busNumber: bus.bus_number,
+      routeName: bus.route_name,
+      capacity: bus.capacity,
+      currentPassengers: bus.current_passengers,
+      status: bus.status,
+      speed: bus.speed,
+      tripStatus: bus.trip_status,
+      currentStopIndex: bus.current_stop_index,
+      delayStatus: bus.delay_status,
+      delayMinutes: bus.delay_minutes,
+      engineStatus: bus.engine_status,
+      latitude: bus.latitude,
+      longitude: bus.longitude,
+      lastUpdated: bus.last_updated
+    };
+
+    res.json({
+      success: true,
+      busDetails,
+      driverInfo,
+      message: 'Bus details retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching bus details by driver ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bus details',
+      error: error.message
+    });
   }
 };

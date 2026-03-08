@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import useGeolocation from '../../hooks/useGeolocation';
 
-const EmergencyButton = ({ onEmergency }) => {
+const EmergencyButton = ({ onEmergency, floating = false, isEmergencyActive = false }) => {
     const { location } = useGeolocation();
     const [showConfirm, setShowConfirm] = useState(false);
     const [alertType, setAlertType] = useState('breakdown');
@@ -10,114 +10,153 @@ const EmergencyButton = ({ onEmergency }) => {
     const [sending, setSending] = useState(false);
 
     const alertTypes = [
-        { value: 'breakdown', label: 'Vehicle Breakdown', icon: 'fa-car-crash', color: 'orange' },
-        { value: 'accident', label: 'Accident', icon: 'fa-exclamation-triangle', color: 'red' },
-        { value: 'medical', label: 'Medical Emergency', icon: 'fa-ambulance', color: 'red' },
-        { value: 'other', label: 'Other Emergency', icon: 'fa-bell', color: 'yellow' }
+        { value: 'breakdown', label: 'Vehicle Breakdown', icon: 'fa-car-crash' },
+        { value: 'accident', label: 'Accident', icon: 'fa-exclamation-triangle' },
+        { value: 'route_blocked', label: 'Route Blocked', icon: 'fa-road' },
+        { value: 'medical', label: 'Medical Emergency', icon: 'fa-ambulance' },
+        { value: 'other', label: 'Other Emergency', icon: 'fa-bell' }
     ];
 
     const handleEmergency = async () => {
         setSending(true);
-
         const alertData = {
             alertType,
             message: message || `Emergency: ${alertTypes.find(t => t.value === alertType)?.label}`,
             latitude: location?.latitude || null,
-            longitude: location?.longitude || null
+            longitude: location?.longitude || null,
+            timestamp: new Date()
         };
-
         await onEmergency(alertData);
         setSending(false);
         setShowConfirm(false);
         setMessage('');
     };
 
-    if (showConfirm) {
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                    <div className="p-6">
-                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-                            <i className="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+    // Emergency Confirmation Modal
+    const renderModal = () => (
+        <div className="emergency-modal-overlay">
+            <div className="emergency-modal">
+                {/* Emergency Header */}
+                <div className="emergency-modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                        <i className="fas fa-exclamation-triangle" style={{ fontSize: '28px' }}></i>
+                        <h2 style={{ fontSize: '22px', fontWeight: 900, margin: 0, letterSpacing: '1px' }}>EMERGENCY ALERT</h2>
+                    </div>
+                    <p style={{ fontSize: '13px', opacity: 0.85, marginTop: '6px' }}>This will notify all administrators immediately</p>
+                </div>
+
+                <div className="emergency-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Alert Type Selection */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'white', marginBottom: '10px' }}>
+                            Select Emergency Type
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            {alertTypes.map((type) => (
+                                <button
+                                    key={type.value}
+                                    onClick={() => setAlertType(type.value)}
+                                    className={`driver-alert-type-btn ${alertType === type.value ? 'selected' : ''}`}
+                                >
+                                    <i className={`fas ${type.icon}`}></i>
+                                    <span>{type.label}</span>
+                                </button>
+                            ))}
                         </div>
+                    </div>
 
-                        <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
-                            Send Emergency Alert?
-                        </h2>
-                        <p className="text-center text-gray-600 mb-6">
-                            This will immediately notify the administration with your location.
-                        </p>
-
-                        {/* Alert Type Selection */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                Emergency Type
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {alertTypes.map((type) => (
-                                    <button
-                                        key={type.value}
-                                        onClick={() => setAlertType(type.value)}
-                                        className={`p-3 rounded-lg border-2 transition-all ${alertType === type.value
-                                                ? `border-${type.color}-500 bg-${type.color}-50`
-                                                : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <i className={`fas ${type.icon} text-lg mb-1`}></i>
-                                        <div className="text-xs font-medium">{type.label}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Message */}
+                    {/* Message */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'white', marginBottom: '8px' }}>
+                            Additional Details (Optional)
+                        </label>
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Describe the emergency (optional)..."
+                            placeholder="Describe the emergency situation..."
                             rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 mb-4"
-                        ></textarea>
+                            className="driver-textarea"
+                            style={{ minHeight: '80px' }}
+                        />
+                    </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowConfirm(false)}
-                                disabled={sending}
-                                className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleEmergency}
-                                disabled={sending}
-                                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-semibold hover:from-red-600 hover:to-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {sending ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        Sending...
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="fas fa-bell"></i>
-                                        Send Alert
-                                    </>
-                                )}
-                            </button>
+                    {/* Location Info */}
+                    {location && (
+                        <div style={{
+                            padding: '10px 14px', background: 'var(--driver-blue-dim)',
+                            borderRadius: 'var(--driver-radius-sm)', border: '1px solid rgba(59,130,246,0.15)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--driver-blue)' }}>
+                                <i className="fas fa-map-marker-alt"></i>
+                                <span>GPS: {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}</span>
+                            </div>
                         </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '12px', paddingTop: '4px' }}>
+                        <button
+                            onClick={() => setShowConfirm(false)}
+                            disabled={sending}
+                            className="driver-btn driver-btn-ghost"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleEmergency}
+                            disabled={sending}
+                            className="driver-btn driver-btn-danger"
+                        >
+                            {sending ? (
+                                <>
+                                    <div className="driver-spinner" style={{ width: '20px', height: '20px' }}></div>
+                                    Sending...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fas fa-bell"></i>
+                                    SEND ALERT
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>
+        </div>
+    );
+
+    // Floating SOS Button
+    if (floating) {
+        return (
+            <>
+                <button
+                    onClick={() => setShowConfirm(true)}
+                    className={`sos-floating ${isEmergencyActive ? 'emergency-active' : ''}`}
+                >
+                    <i className="fas fa-exclamation-triangle sos-icon"></i>
+                    <span className="sos-text">SOS</span>
+                </button>
+                {showConfirm && renderModal()}
+            </>
         );
+    }
+
+    // Embedded inline button
+    if (showConfirm) {
+        return renderModal();
     }
 
     return (
         <button
             onClick={() => setShowConfirm(true)}
-            className="w-full p-4 bg-gradient-to-r from-red-50 to-red-600 text-white rounded-xl font-bold text-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg border-2 border-red-700 flex items-center justify-center gap-3 animate-pulse"
+            className="driver-btn driver-btn-danger driver-btn-xl"
         >
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
-                <i className="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+            <div style={{
+                width: '40px', height: '40px', borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center'
+            }}>
+                <i className="fas fa-exclamation-triangle" style={{ fontSize: '18px' }}></i>
             </div>
             <span>EMERGENCY ALERT</span>
         </button>

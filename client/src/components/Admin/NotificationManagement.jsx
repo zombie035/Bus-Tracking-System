@@ -26,6 +26,11 @@ const NotificationManagement = () => {
         expiresIn: 24 // hours
     });
 
+    const [file, setFile] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadStatus, setUploadStatus] = useState(null); // 'success' | 'error' | null
+
     const [toast, setToast] = useState(null);
 
     useEffect(() => {
@@ -55,21 +60,86 @@ const NotificationManagement = () => {
         }
     };
 
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFileSelect(e.target.files[0]);
+        }
+    };
+
+    const handleFileSelect = (selectedFile) => {
+        if (!selectedFile) return;
+
+        // Client-side validation to match server rules
+        const allowedTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'application/zip',
+            'application/x-zip-compressed'
+        ];
+
+        const maxSize = 10 * 1024 * 1024; // 10MB
+
+        if (!allowedTypes.includes(selectedFile.type)) {
+            setToast({
+                type: 'error',
+                message: 'Unsupported file type. Only PDF, DOCX, PPT, images, and ZIP are allowed.'
+            });
+            setFile(null);
+            return;
+        }
+
+        if (selectedFile.size > maxSize) {
+            setToast({
+                type: 'error',
+                message: 'File is too large. Maximum size is 10MB.'
+            });
+            setFile(null);
+            return;
+        }
+
+        setFile(selectedFile);
+        setUploadProgress(0);
+        setUploadStatus(null);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setUploadProgress(0);
+        setUploadStatus(null);
 
         try {
             // Calculate expiration date
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + parseInt(formData.expiresIn));
 
-            const payload = {
-                ...formData,
-                expiresAt: expiresAt.toISOString()
-            };
+            // FormData for file upload
+            const data = new FormData();
+            data.append('title', formData.title);
+            data.append('message', formData.message);
+            data.append('recipientType', formData.recipientType);
+            data.append('notificationType', formData.notificationType);
+            data.append('expiresAt', expiresAt.toISOString());
+            if (file) {
+                data.append('file', file);
+            }
 
-            const response = await api.post('/api/admin/notifications/broadcast', payload);
+            const response = await api.post('/api/admin/notifications/broadcast', data, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                },
+                onUploadProgress: (event) => {
+                    if (!event.total) return;
+                    const percent = Math.round((event.loaded * 100) / event.total);
+                    setUploadProgress(percent);
+                }
+            });
 
             if (response.data.success) {
                 setToast({ type: 'success', message: 'Notification broadcasted successfully!' });
@@ -80,12 +150,20 @@ const NotificationManagement = () => {
                     notificationType: 'info',
                     expiresIn: 24
                 });
+                setFile(null); // Reset file
+                setUploadStatus('success');
+                setUploadProgress(0);
                 fetchHistory(); // Refresh history
                 fetchStats(); // Refresh stats
             }
         } catch (error) {
             console.error('Error sending notification:', error);
-            setToast({ type: 'error', message: 'Failed to send notification' });
+            const message =
+                error.response?.data?.message ||
+                error.message ||
+                'Failed to send notification';
+            setToast({ type: 'error', message });
+            setUploadStatus('error');
         } finally {
             setLoading(false);
             // Clear toast after 3 seconds
@@ -239,6 +317,89 @@ const NotificationManagement = () => {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
+                                <div
+                                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors relative ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                            handleFileSelect(e.dataTransfer.files[0]);
+                                        }
+                                    }}
+                                >
+                                    <div className="space-y-2 text-center">
+                                        {!file ? (
+                                            <>
+                                                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                                <div className="flex text-sm text-gray-600 justify-center">
+                                                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                                        <span>Browse file</span>
+                                                        <input
+                                                            id="file-upload"
+                                                            name="file-upload"
+                                                            type="file"
+                                                            className="sr-only"
+                                                            onChange={handleFileChange}
+                                                        />
+                                                    </label>
+                                                    <p className="pl-1">or drag and drop</p>
+                                                </div>
+                                                <p className="text-xs text-gray-500">PDF, DOCX, PPT, images, ZIP up to 10MB</p>
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 bg-blue-50 px-3 py-2 rounded-full max-w-full">
+                                                    <span className="font-semibold truncate max-w-[160px]" title={file.name}>
+                                                        {file.name}
+                                                    </span>
+                                                    <span className="text-gray-500 text-xs">
+                                                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                                                    </span>
+                                                    <span className="text-gray-400 text-xs uppercase">
+                                                        {file.type || 'Unknown type'}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFile(null)}
+                                                        className="text-red-500 hover:text-red-700 ml-1"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs text-green-600 font-medium">
+                                                    {uploadStatus === 'success'
+                                                        ? 'Uploaded successfully'
+                                                        : uploadStatus === 'error'
+                                                            ? 'Upload failed. Please try again.'
+                                                            : 'Ready to upload'}
+                                                </p>
+                                                {uploadProgress > 0 && uploadProgress < 100 && (
+                                                    <div className="w-full max-w-xs h-2 bg-gray-200 rounded-full overflow-hidden mt-1">
+                                                        <div
+                                                            className="h-full bg-blue-500 transition-all"
+                                                            style={{ width: `${uploadProgress}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <button
                                 type="submit"
                                 disabled={loading}
@@ -271,6 +432,7 @@ const NotificationManagement = () => {
                                         <th className="px-6 py-4">Target</th>
                                         <th className="px-6 py-4">Type</th>
                                         <th className="px-6 py-4">Sent At</th>
+                                        <th className="px-6 py-4">Attachment</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -284,7 +446,15 @@ const NotificationManagement = () => {
                                         history.map((item) => (
                                             <tr key={item.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4">
-                                                    <p className="font-semibold text-gray-900">{item.title}</p>
+                                                    <p className="font-semibold text-gray-900 flex items-center gap-2">
+                                                        {item.title}
+                                                        {item.attachment_url && (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-semibold border border-blue-100">
+                                                                <i className="fas fa-paperclip" />
+                                                                File
+                                                            </span>
+                                                        )}
+                                                    </p>
                                                     <p className="truncate max-w-xs">{item.message}</p>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -297,8 +467,25 @@ const NotificationManagement = () => {
                                                         {item.notification_type}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     {new Date(item.created_at).toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {item.attachment_url ? (
+                                                        <a
+                                                            href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${item.attachment_url}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 border border-gray-200"
+                                                        >
+                                                            <i className="fas fa-download" />
+                                                            <span className="truncate max-w-[120px]">
+                                                                {item.attachment_name || 'Download'}
+                                                            </span>
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">—</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))

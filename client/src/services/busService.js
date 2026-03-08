@@ -451,12 +451,9 @@ export const busService = {
           hasLocation: !!(busData.latitude && busData.longitude)
         });
 
-        // If no location, add a default fallback (Delhi center as example)
+        // If no location, we now return as is to avoid "forcing" values
         if (!busData.latitude || !busData.longitude) {
-          console.warn('⚠️ Bus has no location, using fallback coordinates');
-          busData.latitude = 28.6139; // Delhi latitude
-          busData.longitude = 77.2090; // Delhi longitude
-          busData.isDefaultLocation = true; // Flag to show it's not real
+          console.warn('⚠️ Bus has no location in database');
         }
 
         return busData;

@@ -18,7 +18,11 @@ exports.getNotifications = async (req, res) => {
         notification_type, 
         is_read, 
         created_at,
-        sender_id
+        sender_id,
+        attachment_url,
+        attachment_name,
+        attachment_type,
+        attachment_size
       FROM notifications
       WHERE (
         recipient_type = 'all' 
@@ -90,10 +94,17 @@ exports.createNotification = async (req, res) => {
             });
         }
 
+        // File Attachment
+        const attachmentUrl = req.file ? `/uploads/notifications/${req.file.filename}` : null;
+        const attachmentName = req.file ? req.file.originalname : null;
+        const attachmentType = req.file ? req.file.mimetype : null;
+        const attachmentSize = req.file ? req.file.size : null;
+
         const query = `
       INSERT INTO notifications (
-        recipient_type, recipient_id, sender_id, title, message, notification_type, expires_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        recipient_type, recipient_id, sender_id, title, message, notification_type, expires_at,
+        attachment_url, attachment_name, attachment_type, attachment_size
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -104,7 +115,11 @@ exports.createNotification = async (req, res) => {
             title,
             message,
             notificationType,
-            expiresAt || null
+            expiresAt || null,
+            attachmentUrl,
+            attachmentName,
+            attachmentType,
+            attachmentSize
         ]);
 
         const notification = result.rows[0];
@@ -261,10 +276,17 @@ exports.broadcastNotification = async (req, res) => {
             });
         }
 
+        // File Attachment
+        const attachmentUrl = req.file ? `/uploads/notifications/${req.file.filename}` : null;
+        const attachmentName = req.file ? req.file.originalname : null;
+        const attachmentType = req.file ? req.file.mimetype : null;
+        const attachmentSize = req.file ? req.file.size : null;
+
         const query = `
       INSERT INTO notifications (
-        recipient_type, recipient_id, sender_id, title, message, notification_type, expires_at
-      ) VALUES ($1, NULL, $2, $3, $4, $5, $6)
+        recipient_type, recipient_id, sender_id, title, message, notification_type, expires_at,
+        attachment_url, attachment_name, attachment_type, attachment_size
+      ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -274,7 +296,11 @@ exports.broadcastNotification = async (req, res) => {
             title,
             message,
             notificationType || 'info',
-            expiresAt || null
+            expiresAt || null,
+            attachmentUrl,
+            attachmentName,
+            attachmentType,
+            attachmentSize
         ]);
 
         const notification = result.rows[0];

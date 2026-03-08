@@ -1,6 +1,6 @@
 // client/src/contexts/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const AuthContext = createContext({});
 
@@ -18,10 +18,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await axios.get('/api/auth/check', {
-        withCredentials: true
-      });
-
+      const response = await api.get('/api/auth/check');
       if (response.data.authenticated) {
         setUser(response.data.user);
       }
@@ -36,10 +33,13 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       console.log('🔐 Attempting login with identifier:', identifier);
-      const response = await axios.post('/api/auth/login', {
+      
+      const response = await api.post('/api/auth/login', {
         identifier, // Can be email or phone number
         password
       });
+
+      console.log('🔍 Server response:', response.data);
 
       if (response.data.success) {
         setUser(response.data.user);
@@ -49,11 +49,24 @@ export const AuthProvider = ({ children }) => {
           role: response.data.user.role
         };
       }
-      return { success: false };
+      
+      setError(response.data.message || 'Login failed');
+      return { success: false, message: response.data.message };
     } catch (err) {
-      const message = err.response?.data?.message || 'Login failed';
+      console.error('❌ Login error:', err);
+
+      let message = 'Login failed';
+      if (err.code === 'ERR_NETWORK') {
+        message = 'Network Error: Cannot connect to server. Check IP and Port.';
+      } else if (err.response?.status === 401) {
+        message = 'Invalid credentials. Please try again.';
+      } else if (err.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err.error) {
+        message = err.error;
+      }
+
       setError(message);
-      console.error('❌ Login error:', message);
       return { success: false, message };
     } finally {
       setLoading(false);
@@ -62,7 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout', {}, {
+      await api.post('/api/auth/logout', {}, {
         withCredentials: true
       });
       setUser(null);

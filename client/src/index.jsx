@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/index.css';
+import 'leaflet/dist/leaflet.css'; // Fix for black map tiles
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 

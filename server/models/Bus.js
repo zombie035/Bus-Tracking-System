@@ -15,13 +15,22 @@ class Bus {
           id,
           bus_number as "busNumber",
           route_name as "routeName",
+          route_name as "routeId",
           capacity,
           current_passengers as "currentPassengers",
           status,
           driver_id as "driverId",
           latitude,
           longitude,
-          updated_at as "updatedAt"
+          speed,
+          trip_status as "tripStatus",
+          current_stop_index as "currentStopIndex",
+          delay_status as "delayStatus",
+          delay_minutes as "delayMinutes",
+          engine_status as "engineStatus",
+          direction,
+          next_stop_name as "nextStopName",
+          updated_at as "lastUpdated"
         FROM buses 
         ORDER BY bus_number
       `;
@@ -52,6 +61,7 @@ class Bus {
           b.id,
           b.bus_number as "busNumber",
           b.route_name as "routeName",
+          b.route_name as "routeId",
           b.capacity,
           b.current_passengers as "currentPassengers",
           b.status,
@@ -59,10 +69,15 @@ class Bus {
           b.latitude,
           b.longitude,
           b.speed,
+          b.trip_status as "tripStatus",
+          b.current_stop_index as "currentStopIndex",
+          b.delay_status as "delayStatus",
+          b.delay_minutes as "delayMinutes",
           b.engine_status as "engineStatus",
           b.direction,
+          b.next_stop_name as "nextStopName",
           b.idle_start_time as "idleStartTime",
-          b.updated_at as "updatedAt",
+          b.updated_at as "lastUpdated",
           u.name as "driverName",
           u.email as "driverEmail",
           u.phone as "driverPhone"
@@ -98,13 +113,22 @@ class Bus {
           id,
           bus_number as "busNumber",
           route_name as "routeName",
+          route_name as "routeId",
           capacity,
           current_passengers as "currentPassengers",
           status,
           driver_id as "driverId",
           latitude,
           longitude,
-          updated_at as "updatedAt"
+          speed,
+          trip_status as "tripStatus",
+          current_stop_index as "currentStopIndex",
+          delay_status as "delayStatus",
+          delay_minutes as "delayMinutes",
+          engine_status as "engineStatus",
+          direction,
+          next_stop_name as "nextStopName",
+          updated_at as "lastUpdated"
         FROM buses 
         WHERE id = $1
       `;
@@ -227,6 +251,7 @@ class Bus {
           id,
           bus_number as "busNumber",
           route_name as "routeName",
+          route_name as "routeId",
           capacity,
           current_passengers as "currentPassengers",
           status,
@@ -234,7 +259,14 @@ class Bus {
           latitude,
           longitude,
           speed,
-          updated_at as "updatedAt"
+          trip_status as "tripStatus",
+          current_stop_index as "currentStopIndex",
+          delay_status as "delayStatus",
+          delay_minutes as "delayMinutes",
+          engine_status as "engineStatus",
+          direction,
+          next_stop_name as "nextStopName",
+          updated_at as "lastUpdated"
       `;
 
       console.log('Update query:', query);

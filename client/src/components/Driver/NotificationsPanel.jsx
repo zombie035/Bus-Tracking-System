@@ -37,27 +37,27 @@ const NotificationsPanel = () => {
         }
     };
 
-    const getTypeIcon = (type) => {
-        const icons = {
-            warning: { icon: 'fa-exclamation-triangle', color: 'text-orange-600', bg: 'bg-orange-100' },
-            alert: { icon: 'fa-exclamation-circle', color: 'text-red-600', bg: 'bg-red-100' },
-            route_change: { icon: 'fa-route', color: 'text-blue-600', bg: 'bg-blue-100' },
-            info: { icon: 'fa-info-circle', color: 'text-blue-600', bg: 'bg-blue-100' }
+    const getTypeStyle = (type) => {
+        const styles = {
+            warning: { icon: 'fa-exclamation-triangle', color: 'var(--driver-orange)', bg: 'var(--driver-orange-dim)' },
+            alert: { icon: 'fa-exclamation-circle', color: 'var(--driver-red)', bg: 'var(--driver-red-dim)' },
+            route_change: { icon: 'fa-route', color: 'var(--driver-blue)', bg: 'var(--driver-blue-dim)' },
+            info: { icon: 'fa-info-circle', color: 'var(--driver-blue)', bg: 'var(--driver-blue-dim)' }
         };
-        return icons[type] || icons.info;
+        return styles[type] || styles.info;
     };
 
     const displayNotifications = showAll ? notifications : notifications.slice(0, 5);
 
     if (loading) {
         return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+            <div className="driver-glass-card" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="driver-skeleton" style={{ height: '24px', width: '40%' }}></div>
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="space-y-2">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div className="driver-skeleton" style={{ height: '16px', width: '70%' }}></div>
+                            <div className="driver-skeleton" style={{ height: '14px', width: '50%' }}></div>
                         </div>
                     ))}
                 </div>
@@ -66,84 +66,116 @@ const NotificationsPanel = () => {
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="driver-glass-card" style={{ overflow: 'hidden' }}>
             {/* Header */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow">
+            <div className="driver-glass-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        width: '36px', height: '36px', borderRadius: '10px',
+                        background: 'linear-gradient(135deg, var(--driver-purple), var(--driver-blue))',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: '14px'
+                    }}>
                         <i className="fas fa-bell"></i>
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-900">Notifications</h3>
+                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'white', margin: 0 }}>Notifications</h3>
                         {unreadCount > 0 && (
-                            <p className="text-xs text-gray-600">{unreadCount} unread</p>
+                            <p style={{ fontSize: '12px', color: 'var(--driver-text-muted)', margin: '2px 0 0' }}>{unreadCount} unread</p>
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {unreadCount > 0 && (
-                        <span className="px-3 py-1 bg-red-500 text-white rounded-full text-xs font-bold animate-pulse">
+                        <span style={{
+                            padding: '2px 10px', background: 'var(--driver-red)',
+                            color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 700
+                        }}>
                             {unreadCount}
                         </span>
                     )}
                     <button
                         onClick={fetchNotifications}
-                        className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors"
+                        style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: 'var(--driver-surface)', border: '1px solid var(--driver-border)',
+                            color: 'var(--driver-text-dim)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
                         title="Refresh"
                     >
-                        <i className="fas fa-sync-alt"></i>
+                        <i className="fas fa-sync-alt" style={{ fontSize: '12px' }}></i>
                     </button>
                 </div>
             </div>
 
             {/* Notifications List */}
-            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
+            <div style={{ maxHeight: '380px', overflowY: 'auto' }} className="driver-scrollable">
                 {notifications.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                            <i className="fas fa-inbox text-gray-300 text-2xl"></i>
+                    <div style={{ padding: '32px', textAlign: 'center' }}>
+                        <div style={{
+                            width: '56px', height: '56px', borderRadius: '50%',
+                            background: 'var(--driver-surface)', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 12px', fontSize: '24px', color: 'var(--driver-text-muted)'
+                        }}>
+                            <i className="fas fa-inbox"></i>
                         </div>
-                        <p className="text-gray-600 font-medium">No notifications</p>
-                        <p className="text-sm text-gray-500 mt-1">You're all caught up!</p>
+                        <p style={{ color: 'var(--driver-text-dim)', fontWeight: 600 }}>No notifications</p>
+                        <p style={{ color: 'var(--driver-text-muted)', fontSize: '13px', marginTop: '4px' }}>You're all caught up!</p>
                     </div>
                 ) : (
                     <>
                         {displayNotifications.map((notif) => {
-                            const typeStyle = getTypeIcon(notif.notificationType);
+                            const typeStyle = getTypeStyle(notif.notificationType);
                             return (
                                 <div
                                     key={notif.id}
                                     onClick={() => !notif.isRead && markAsRead(notif.id)}
-                                    className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${!notif.isRead ? 'bg-purple-50 border-l-4 border-purple-500' : ''
-                                        }`}
+                                    style={{
+                                        padding: '14px 16px', cursor: 'pointer',
+                                        borderBottom: '1px solid var(--driver-border)',
+                                        background: !notif.isRead ? 'rgba(139,92,246,0.08)' : 'transparent',
+                                        borderLeft: !notif.isRead ? '3px solid var(--driver-purple)' : '3px solid transparent',
+                                        transition: 'background 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--driver-surface-hover)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = !notif.isRead ? 'rgba(139,92,246,0.08)' : 'transparent'; }}
                                 >
-                                    <div className="flex gap-3">
-                                        {/* Icon */}
-                                        <div className={`flex-shrink-0 w-10 h-10 rounded-lg ${typeStyle.bg} flex items-center justify-center`}>
-                                            <i className={`fas ${typeStyle.icon} ${typeStyle.color}`}></i>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <div style={{
+                                            width: '36px', height: '36px', borderRadius: '10px',
+                                            background: typeStyle.bg, display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                        }}>
+                                            <i className={`fas ${typeStyle.icon}`} style={{ color: typeStyle.color, fontSize: '14px' }}></i>
                                         </div>
-
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                <h4 className="font-semibold text-gray-900 line-clamp-1">{notif.title}</h4>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                                                <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {notif.title}
+                                                </h4>
                                                 {!notif.isRead && (
-                                                    <div className="flex-shrink-0 w-2 h-2 bg-purple-600 rounded-full mt-1.5"></div>
+                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--driver-purple)', flexShrink: 0 }}></div>
                                                 )}
                                             </div>
-                                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">{notif.message}</p>
-                                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                <span className="flex items-center gap-1">
+                                            <p style={{ fontSize: '13px', color: 'var(--driver-text-dim)', margin: '0 0 6px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                                {notif.message}
+                                            </p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontSize: '11px', color: 'var(--driver-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     <i className="fas fa-clock"></i>
                                                     {new Date(notif.createdAt).toLocaleString('en-IN', {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
+                                                        month: 'short', day: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit'
                                                     })}
                                                 </span>
                                                 {!notif.isRead && (
-                                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                                                    <span style={{
+                                                        padding: '1px 8px', background: 'var(--driver-purple-dim)',
+                                                        color: 'var(--driver-purple)', borderRadius: '10px',
+                                                        fontSize: '10px', fontWeight: 700
+                                                    }}>
                                                         New
                                                     </span>
                                                 )}
@@ -154,24 +186,15 @@ const NotificationsPanel = () => {
                             );
                         })}
 
-                        {/* Show More/Less Button */}
                         {notifications.length > 5 && (
-                            <div className="p-3 border-t border-gray-200">
+                            <div style={{ padding: '10px 12px', borderTop: '1px solid var(--driver-border)' }}>
                                 <button
                                     onClick={() => setShowAll(!showAll)}
-                                    className="w-full px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                                    className="driver-btn driver-btn-ghost"
+                                    style={{ padding: '8px', textTransform: 'none', fontSize: '13px' }}
                                 >
-                                    {showAll ? (
-                                        <>
-                                            <i className="fas fa-chevron-up mr-2"></i>
-                                            Show Less
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-chevron-down mr-2"></i>
-                                            Show All ({notifications.length})
-                                        </>
-                                    )}
+                                    <i className={`fas fa-chevron-${showAll ? 'up' : 'down'}`}></i>
+                                    {showAll ? 'Show Less' : `Show All (${notifications.length})`}
                                 </button>
                             </div>
                         )}

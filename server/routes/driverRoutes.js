@@ -47,5 +47,7 @@ router.put('/settings', driverController.updateSettings);
 
 // Bus Details
 router.get('/bus-details', driverController.getBusDetails);
+router.get('/bus-details/:driverName', driverController.getBusDetailsByDriverName);
+router.get('/bus-by-driver-id/:driverId', driverController.getBusDetailsByDriverId);
 
 module.exports = router;

@@ -70,7 +70,7 @@ exports.login = async (req, res) => {
         role: user.role,
         studentId: user.student_id || null,
         phone: user.phone || null,
-        busAssigned: user.bus_assigned || null
+        bus_assigned: user.bus_assigned || null
       }
     });
   } catch (error) {
@@ -107,7 +107,8 @@ exports.checkAuth = (req, res) => {
         id: req.session.userId,
         name: req.session.name,
         email: req.session.email,
-        role: req.session.role
+        role: req.session.role,
+        bus_assigned: req.session.busAssigned || null
       }
     });
   } else {

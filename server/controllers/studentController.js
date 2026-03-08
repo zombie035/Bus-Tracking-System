@@ -160,12 +160,12 @@ exports.getMyRouteStops = async (req, res) => {
 
         console.log('🛣️ Querying route stops for route:', myBus.routeName);
 
-        // Fetch route stops from database
+        // Fetch route stops from database (Case Insensitive)
         const result = await pool.query(
             `SELECT id, stop_name as "stopName", stop_order as "stopOrder",
               latitude, longitude, pickup_time as "pickupTime", drop_time as "dropTime"
        FROM route_stops
-       WHERE route_name = $1
+       WHERE LOWER(route_name) = LOWER($1)
        ORDER BY stop_order ASC`,
             [myBus.routeName]
         );
@@ -235,9 +235,33 @@ exports.getMyProfile = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Get bus assignment
+        // Get bus assignment with driver info
         const buses = await Bus.findWithDrivers();
-        const myBus = buses.find(b => b.id === user.bus_assigned);
+
+        console.log(`DEBUG: Found ${buses.length} total buses`);
+        console.log(`DEBUG: User assigned bus ID: ${user.bus_assigned} (type: ${typeof user.bus_assigned})`);
+
+        // Robust matching: handle potential string/number mismatch
+        // Robust matching: handle potential string/number mismatch AND busNumber vs ID
+        let myBus = buses.find(b => b.id == user.bus_assigned);
+
+        // Fallback: If not found by ID, try finding by busNumber
+        if (!myBus) {
+            console.log(`DEBUG: ID match failed. Trying to match by busNumber: ${user.bus_assigned}`);
+            myBus = buses.find(b => b.busNumber == user.bus_assigned);
+        }
+
+        if (myBus) {
+            console.log(`DEBUG: Found matching bus:`, {
+                id: myBus.id,
+                busNumber: myBus.busNumber,
+                matchType: myBus.id == user.bus_assigned ? 'ID' : 'BusNumber',
+                driverName: myBus.driverName,
+                driverPhone: myBus.driverPhone
+            });
+        } else {
+            console.log('DEBUG: No matching bus found for user via ID or BusNumber');
+        }
 
         res.json({
             success: true,
@@ -249,11 +273,23 @@ exports.getMyProfile = async (req, res) => {
                 phone: user.phone,
                 role: user.role,
                 busNumber: myBus?.busNumber || null,
+                busId: myBus?.id || null,
                 routeName: myBus?.routeName || null,
                 boardingStop: user.boarding_stop || null,
                 droppingStop: user.dropping_stop || null,
                 boardingStopTime: user.boarding_stop_time || null,
-                droppingStopTime: user.dropping_stop_time || null
+                droppingStopTime: user.dropping_stop_time || null,
+                // Driver information from assigned bus
+                driverName: myBus?.driverName || null,
+                driverPhone: myBus?.driverPhone || null,
+                driverEmail: myBus?.driverEmail || null
+            },
+            debug: {
+                userBusId: user.bus_assigned,
+                totalBuses: buses.length,
+                foundBus: !!myBus,
+                foundBusId: myBus?.id,
+                driverInfoPresent: !!(myBus?.driverName || myBus?.driverPhone)
             }
         });
     } catch (error) {
@@ -765,9 +801,96 @@ exports.getDailySchedule = async (req, res) => {
 };
 
 // Get student notifications (reuse Notification model from driver dashboard)
-// Get student notifications (STUB)
+// Get student notifications
 exports.getNotifications = async (req, res) => {
-    res.json({ success: true, notifications: [] });
+    try {
+        const { pool } = require('../config/db');
+        const userId = req.session.userId;
+        const role = req.session.role;
+        const { limit = 50, unreadOnly = false } = req.query;
+
+        console.log(`📬 Fetching notifications for student ${userId} (${role})`);
+
+        let query = `
+          SELECT 
+            id, 
+            title, 
+            message, 
+            notification_type, 
+            is_read, 
+            created_at,
+            sender_id,
+            attachment_url,
+            attachment_name,
+            attachment_type,
+            attachment_size
+          FROM notifications
+          WHERE (
+            recipient_type = 'all' 
+            OR (recipient_type = $1 AND (recipient_id IS NULL OR recipient_id = $2))
+          )
+          AND (expires_at IS NULL OR expires_at > NOW())
+        `;
+
+        const params = [role, userId];
+
+        if (unreadOnly === 'true') {
+            query += ' AND is_read = FALSE';
+        }
+
+        query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
+        params.push(parseInt(limit));
+
+        const result = await pool.query(query, params);
+
+        // Get sender names for notifications
+        const notifications = await Promise.all(
+            result.rows.map(async (notification) => {
+                if (notification.sender_id) {
+                    const senderResult = await pool.query(
+                        'SELECT name FROM users WHERE id = $1',
+                        [notification.sender_id]
+                    );
+                    notification.sender_name = senderResult.rows[0]?.name || 'System';
+                } else {
+                    notification.sender_name = 'System';
+                }
+                return notification;
+            })
+        );
+
+        const unreadCount = notifications.filter(n => !n.is_read).length;
+
+        // Log notifications with attachments for debugging
+        const notificationsWithAttachments = notifications.filter(n => n.attachment_url);
+        if (notificationsWithAttachments.length > 0) {
+            console.log(`📎 Found ${notificationsWithAttachments.length} notifications with attachments:`,
+                notificationsWithAttachments.map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    attachment_url: n.attachment_url,
+                    attachment_name: n.attachment_name,
+                    attachment_size: n.attachment_size
+                }))
+            );
+        }
+
+        console.log(`✅ Found ${notifications.length} notifications (${unreadCount} unread)`);
+
+        res.json({
+            success: true,
+            notifications,
+            unreadCount,
+            total: notifications.length
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching notifications:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching notifications: ' + error.message
+        });
+    }
 };
 
 // Mark notification as read
@@ -775,19 +898,39 @@ exports.markNotificationRead = async (req, res) => {
     try {
         const { pool } = require('../config/db');
         const { id } = req.params;
+        const userId = req.session.userId;
+        const role = req.session.role;
 
-        await pool.query(
-            'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2',
-            [id, req.session.userId]
-        );
+        console.log(`✓ Marking notification ${id} as read for student ${userId}`);
+
+        const query = `
+          UPDATE notifications 
+          SET is_read = TRUE 
+          WHERE id = $1 
+            AND (recipient_type = 'all' OR (recipient_type = $2 AND (recipient_id IS NULL OR recipient_id = $3)))
+          RETURNING *
+        `;
+
+        const result = await pool.query(query, [id, role, userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
 
         res.json({
             success: true,
-            message: 'Notification marked as read'
+            notification: result.rows[0]
         });
+
     } catch (error) {
-        console.error('Mark notification read error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        console.error('❌ Error marking notification as read:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating notification: ' + error.message
+        });
     }
 };
 
@@ -1184,55 +1327,5 @@ exports.updateSettings = async (req, res) => {
     }
 };
 
-// ==========================================
-// MISSING CONTROLLER METHODS (STUBS)
-// ==========================================
-
-exports.getNotifications = async (req, res) => {
-    res.json({ success: true, notifications: [] });
-};
-
-exports.markNotificationRead = async (req, res) => {
-    res.json({ success: true });
-};
-
-exports.getAnnouncements = async (req, res) => {
-    res.json({ success: true, announcements: [] });
-};
-
-exports.getQuickMessages = async (req, res) => {
-    res.json({ success: true, messages: {} });
-};
-
-exports.getFeedbackHistory = async (req, res) => {
-    res.json({ success: true, feedback: [] });
-};
-
-exports.getSettings = async (req, res) => {
-    res.json({ success: true, settings: {} });
-};
-
-exports.sendContactMessage = async (req, res) => {
-    res.json({ success: true });
-};
-
-exports.reportIssue = async (req, res) => {
-    res.json({ success: true });
-};
-
-exports.getMyStopDetails = async (req, res) => {
-    res.json({ success: true, stops: null });
-};
-
-exports.getDailySchedule = async (req, res) => {
-    res.json({ success: true, schedule: null });
-};
-
-exports.getBusStatus = async (req, res) => {
-    res.json({ success: true, status: 'unknown' });
-};
-
-exports.getETAToMyStop = async (req, res) => {
-    res.json({ success: true, eta: null });
-};
+// End of controller methods
 

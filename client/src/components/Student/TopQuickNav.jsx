@@ -1,10 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { busService } from '../../services/busService';
 
 const TopQuickNav = ({ user, onMenuClick }) => {
     const navigate = useNavigate();
-    const { logout } = useAuth(); // Add useAuth hook for logout
+    const { logout } = useAuth();
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            try {
+                const response = await busService.getStudentNotifications();
+                if (response.success) {
+                    setUnreadCount(response.unreadCount || 0);
+                }
+            } catch (error) {
+                console.error('Error fetching unread count:', error);
+            }
+        };
+
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 60000); // Poll every minute
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="absolute top-12 left-4 right-4 z-[1000] flex justify-between items-center bg-white/90 backdrop-blur-md rounded-full shadow-lg p-2 pl-4 border border-white/20 ring-1 ring-black/5">
@@ -26,7 +45,9 @@ const TopQuickNav = ({ user, onMenuClick }) => {
                     title="Notifications"
                 >
                     <i className="fas fa-bell text-sm"></i>
-                    <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+                    {unreadCount > 0 && (
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                    )}
                 </button>
 
                 <div className="h-4 w-[1px] bg-gray-200 mx-1"></div>

@@ -17,7 +17,6 @@ const StudentPickupList = () => {
         try {
             setLoading(true);
             const response = await busService.getStudentList();
-
             if (response.success) {
                 setStudents(response.students || []);
                 setStudentsByStop(response.studentsByStop || {});
@@ -40,69 +39,91 @@ const StudentPickupList = () => {
 
     if (loading) {
         return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-                    <div className="h-10 bg-gray-200 rounded"></div>
-                    <div className="space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                        ))}
-                    </div>
+            <div className="driver-glass-card" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="driver-skeleton" style={{ height: '24px', width: '40%' }}></div>
+                    <div className="driver-skeleton" style={{ height: '40px' }}></div>
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="driver-skeleton" style={{ height: '60px' }}></div>
+                    ))}
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="driver-glass-card" style={{ overflow: 'hidden' }}>
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <i className="fas fa-users text-blue-600"></i>
+            <div className="driver-glass-header">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                            width: '36px', height: '36px', borderRadius: '10px',
+                            background: 'var(--driver-blue-dim)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            <i className="fas fa-users" style={{ color: 'var(--driver-blue)', fontSize: '14px' }}></i>
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Student Pickup List</h3>
-                            <p className="text-sm text-gray-600">{students.length} students assigned</p>
+                            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'white', margin: 0 }}>Student Pickup List</h3>
+                            <p style={{ fontSize: '12px', color: 'var(--driver-text-muted)', margin: '2px 0 0' }}>{students.length} students assigned</p>
                         </div>
                     </div>
                     <button
                         onClick={fetchStudents}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                        style={{
+                            padding: '6px 12px', borderRadius: '8px',
+                            background: 'var(--driver-surface)', border: '1px solid var(--driver-border)',
+                            color: 'var(--driver-text-dim)', cursor: 'pointer', fontSize: '12px', fontWeight: 600
+                        }}
                     >
-                        <i className="fas fa-sync-alt mr-2"></i>
+                        <i className="fas fa-sync-alt" style={{ marginRight: '6px' }}></i>
                         Refresh
                     </button>
                 </div>
 
                 {/* Search & Filter */}
-                <div className="space-y-3">
-                    <div className="relative">
-                        <i className="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ position: 'relative' }}>
+                        <i className="fas fa-search" style={{
+                            position: 'absolute', left: '14px', top: '13px',
+                            color: 'var(--driver-text-muted)', fontSize: '13px'
+                        }}></i>
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Search students..."
-                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            style={{
+                                width: '100%', paddingLeft: '40px', paddingRight: '14px',
+                                padding: '10px 14px 10px 40px',
+                                background: 'var(--driver-surface)', border: '1px solid var(--driver-border)',
+                                borderRadius: 'var(--driver-radius-sm)', color: 'white',
+                                fontSize: '14px', outline: 'none'
+                            }}
                         />
                     </div>
 
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
                         {stops.map(stop => (
                             <button
                                 key={stop}
                                 onClick={() => setSelectedStop(stop)}
-                                className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${selectedStop === stop
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
+                                style={{
+                                    padding: '6px 14px', borderRadius: '8px',
+                                    fontWeight: 600, fontSize: '12px', whiteSpace: 'nowrap',
+                                    cursor: 'pointer', border: 'none',
+                                    background: selectedStop === stop ? 'var(--driver-green)' : 'var(--driver-surface)',
+                                    color: selectedStop === stop ? 'white' : 'var(--driver-text-dim)',
+                                    transition: 'all 0.2s ease'
+                                }}
                             >
                                 {stop === 'all' ? '📍 All Stops' : stop}
                                 {stop !== 'all' && studentsByStop[stop] && (
-                                    <span className="ml-2 px-2 py-0.5 bg-white bg-opacity-20 rounded-full text-xs">
+                                    <span style={{
+                                        marginLeft: '6px', padding: '1px 6px',
+                                        background: 'rgba(255,255,255,0.2)', borderRadius: '8px', fontSize: '10px'
+                                    }}>
                                         {studentsByStop[stop].length}
                                     </span>
                                 )}
@@ -113,70 +134,78 @@ const StudentPickupList = () => {
             </div>
 
             {/* Student List */}
-            <div className="max-h-96 overflow-y-auto">
+            <div style={{ maxHeight: '380px', overflowY: 'auto' }} className="driver-scrollable">
                 {filteredStudents.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                            <i className="fas fa-user-slash text-gray-400 text-2xl"></i>
+                    <div style={{ padding: '32px', textAlign: 'center' }}>
+                        <div style={{
+                            width: '56px', height: '56px', borderRadius: '50%',
+                            background: 'var(--driver-surface)', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 12px', fontSize: '24px', color: 'var(--driver-text-muted)'
+                        }}>
+                            <i className="fas fa-user-slash"></i>
                         </div>
-                        <p className="text-gray-600">No students found</p>
+                        <p style={{ color: 'var(--driver-text-dim)' }}>No students found</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-gray-100">
-                        {filteredStudents.map((student, index) => (
-                            <div
-                                key={student.id || index}
-                                className="p-4 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                        {student.name?.charAt(0).toUpperCase() || 'S'}
+                    filteredStudents.map((student, index) => (
+                        <div
+                            key={student.id || index}
+                            style={{
+                                padding: '14px 16px',
+                                borderBottom: '1px solid var(--driver-border)',
+                                transition: 'background 0.2s ease',
+                                cursor: 'default'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--driver-surface)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                <div style={{
+                                    width: '44px', height: '44px', borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, var(--driver-blue), var(--driver-purple))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'white', fontWeight: 800, fontSize: '16px', flexShrink: 0
+                                }}>
+                                    {student.name?.charAt(0).toUpperCase() || 'S'}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                        <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: 0 }}>{student.name}</h4>
+                                        <span style={{
+                                            padding: '2px 8px', background: 'var(--driver-blue-dim)',
+                                            color: 'var(--driver-blue)', borderRadius: '6px',
+                                            fontSize: '11px', fontWeight: 600
+                                        }}>
+                                            {student.studentId}
+                                        </span>
                                     </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <h4 className="font-semibold text-gray-900">{student.name}</h4>
-                                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                                                {student.studentId}
-                                            </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--driver-text-dim)' }}>
+                                            <i className="fas fa-map-marker-alt" style={{ color: 'var(--driver-green)', width: '14px' }}></i>
+                                            <span style={{ fontWeight: 600 }}>Pickup:</span>
+                                            <span>{student.boardingStop || 'N/A'}</span>
+                                            {student.boardingTime && <span style={{ color: 'var(--driver-text-muted)' }}>• {student.boardingTime}</span>}
                                         </div>
-
-                                        <div className="space-y-1 text-sm text-gray-600">
-                                            <div className="flex items-center gap-2">
-                                                <i className="fas fa-map-marker-alt text-green-600 w-4"></i>
-                                                <span className="font-medium">Pickup:</span>
-                                                <span>{student.boardingStop || 'N/A'}</span>
-                                                {student.boardingTime && (
-                                                    <span className="text-gray-500">• {student.boardingTime}</span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                <i className="fas fa-map-marker-alt text-red-600 w-4"></i>
-                                                <span className="font-medium">Drop:</span>
-                                                <span>{student.droppingStop || 'N/A'}</span>
-                                                {student.droppingTime && (
-                                                    <span className="text-gray-500">• {student.droppingTime}</span>
-                                                )}
-                                            </div>
-
-                                            {student.phone && (
-                                                <div className="flex items-center gap-2">
-                                                    <i className="fas fa-phone text-blue-600 w-4"></i>
-                                                    <a
-                                                        href={`tel:${student.phone}`}
-                                                        className="text-blue-600 hover:underline"
-                                                    >
-                                                        {student.phone}
-                                                    </a>
-                                                </div>
-                                            )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--driver-text-dim)' }}>
+                                            <i className="fas fa-map-marker-alt" style={{ color: 'var(--driver-red)', width: '14px' }}></i>
+                                            <span style={{ fontWeight: 600 }}>Drop:</span>
+                                            <span>{student.droppingStop || 'N/A'}</span>
+                                            {student.droppingTime && <span style={{ color: 'var(--driver-text-muted)' }}>• {student.droppingTime}</span>}
                                         </div>
+                                        {student.phone && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+                                                <i className="fas fa-phone" style={{ color: 'var(--driver-blue)', width: '14px' }}></i>
+                                                <a href={`tel:${student.phone}`} style={{ color: 'var(--driver-blue)' }}>
+                                                    {student.phone}
+                                                </a>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>

@@ -8,8 +8,10 @@ const { isAuthenticated, isAdmin } = require('../middleware/authMiddleware');
 router.use(isAuthenticated);
 router.use(isAdmin);
 
+const upload = require('../middleware/uploadMiddleware');
+
 // Broadcast notification to all or specific role
-router.post('/broadcast', notificationController.broadcastNotification);
+router.post('/broadcast', upload.single('file'), notificationController.broadcastNotification);
 
 // Get notification history
 router.get('/history', notificationController.getNotificationHistory);

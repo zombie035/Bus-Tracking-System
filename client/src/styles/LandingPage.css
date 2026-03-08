@@ -1,0 +1,303 @@
+/* Landing Page Styles */
+
+/* Animation delays */
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+/* Custom animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Feature card hover effects */
+.feature-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Login card styles */
+.login-card {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.login-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Button hover effects */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+/* Screenshot card hover */
+.screenshot-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.screenshot-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+.screenshot-card img {
+  transition: transform 0.3s ease;
+}
+
+.screenshot-card:hover img {
+  transform: scale(1.1);
+}
+
+/* Navigation bar scroll effect */
+.navbar-scrolled {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Hero section background animation */
+.hero-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Step number badge */
+.step-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  animation: pulse 2s infinite;
+}
+
+/* Feature icon gradient backgrounds */
+.feature-icon-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.feature-icon-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.feature-icon-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.feature-icon-orange {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.feature-icon-red {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 3rem !important;
+    line-height: 1.2;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.25rem !important;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .login-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* Loading animation */
+.loading-spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Form input focus effects */
+.form-input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+/* Footer link hover */
+.footer-link {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.footer-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: currentColor;
+  transition: width 0.3s ease;
+}
+
+.footer-link:hover::after {
+  width: 100%;
+}
+
+/* Social icon hover */
+.social-icon {
+  transition: all 0.3s ease;
+}
+
+.social-icon:hover {
+  transform: translateY(-3px);
+  color: #3b82f6 !important;
+}
+
+/* Card shadow variations */
+.shadow-elevation-1 {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.shadow-elevation-2 {
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.shadow-elevation-3 {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.10);
+}
+
+.shadow-elevation-4 {
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.15), 0 5px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Text gradient utilities */
+.text-gradient-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Background patterns */
+.bg-pattern-dots {
+  background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.bg-pattern-grid {
+  background-image: 
+    linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}

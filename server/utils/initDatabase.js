@@ -166,12 +166,57 @@ const initDatabase = async () => {
     await pool.query(createRoutesTable);
     console.log('✅ Routes table initialized');
 
+    // Create driver_settings table if it doesn't exist
+    const createDriverSettingsTable = `
+      CREATE TABLE IF NOT EXISTS driver_settings (
+        id SERIAL PRIMARY KEY,
+        driver_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        language VARCHAR(10) DEFAULT 'en',
+        theme VARCHAR(20) DEFAULT 'auto',
+        notifications_enabled BOOLEAN DEFAULT true,
+        sound_enabled BOOLEAN DEFAULT true,
+        auto_start_tracking BOOLEAN DEFAULT false,
+        layout_config JSONB DEFAULT '{
+          "navbarPosition": "bottom",
+          "navStyle": "icons-label",
+          "density": "comfortable",
+          "theme": "auto",
+          "mapControls": "right",
+          "bottomSheetDefault": "collapsed",
+          "emergencyPosition": "top-right"
+        }',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await pool.query(createDriverSettingsTable);
+    console.log('✅ Driver settings table initialized');
+
+    // MIGRATION: Add layout_config if it doesn't exist
+    try {
+      await pool.query('ALTER TABLE driver_settings ADD COLUMN IF NOT EXISTS layout_config JSONB DEFAULT \'{"navbarPosition": "bottom", "navStyle": "icons-label", "density": "comfortable", "theme": "auto", "mapControls": "right", "bottomSheetDefault": "collapsed", "emergencyPosition": "top-right"}\'');
+      console.log('✅ Migrated driver_settings: layout_config column added');
+    } catch (error) {
+      console.warn('⚠️ driver_settings migration warning:', error.message);
+    }
+
     // Create an index for faster lookups
     try {
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      `);
-      console.log('✅ Database indexes created');
+      // Users Performance Indexes
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_users_bus_assigned ON users(bus_assigned);');
+
+      // Buses Performance Indexes
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_buses_driver_id ON buses(driver_id);');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_buses_status ON buses(status);');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_buses_route_name ON buses(route_name);');
+
+      // Routes Performance Indexes
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_routes_route_number ON routes(route_number);');
+
+      console.log('✅ Database performance indexes created');
     } catch (error) {
       console.warn('⚠️ Index creation warning:', error.message);
     }

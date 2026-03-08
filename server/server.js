@@ -35,7 +35,28 @@ const server = http.createServer(app);
 // In server.js, update socket.io configuration:
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // In development, allow ANY origin (or specific patterns if preferred)
+      // This enables mobile testing via LAN IP
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+
+      // Production logic...
+      const allowedOrigins = [
+        process.env.CLIENT_URL,
+        'http://localhost:3000'
+      ];
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -44,24 +65,77 @@ const io = socketIo(server, {
   pingInterval: 25000
 });
 
-// ========== MIDDLEWARE ==========
-// CORS middleware
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+
+
+// ========== OPTIMIZATION MIDDLEWARE ==========
+
+// 1. Compression (Gzip) - Drastically reduces response size
+app.use(compression());
+
+// 2. Helmet - Security Headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for now to avoid React conflicts
+  crossOriginEmbedderPolicy: false
 }));
+
+// 3. Rate Limiting - Prevent Abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again after 15 minutes' // Fixed typo
+});
+app.use('/api', limiter);
+
+// ========== STANDARD MIDDLEWARE ==========
+// CORS Middleware
+app.use(cors({
+  // ... existing cors config ...
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // In development, allow ANY origin
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+
+    // Production logic
+    const allowedOrigins = [
+      process.env.CLIENT_URL,
+      'http://localhost:3000'
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Session middleware - FIXED SETTINGS
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bus-tracking-secret-key-123',
-  resave: true,  // CHANGED FROM false
-  saveUninitialized: true,  // CHANGED FROM false
+  resave: false, // Optimized: don't save session if unmodified
+  saveUninitialized: false, // Optimized: don't create session until something stored
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: 'lax',  // CHANGED FOR DEVELOPMENT
-    secure: false  // CHANGED FOR DEVELOPMENT
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production' // true in production
   }
 }));
 
@@ -195,30 +269,34 @@ io.on('connection', (socket) => {
     timestamp: new Date()
   });
 
-  // Join driver room
-  socket.on('join-driver-room', (driverId) => {
-    if (driverId) {
-      socket.join(`driver-${driverId}`);
-      console.log(`👨‍✈️ Driver ${driverId} connected to room driver-${driverId}`);
+  // Register for notifications (real-time push) - Enhanced with session tracking
+  socket.on('register-notifications', (userId) => {
+    if (userId && global.notificationService) {
+      // Store userId on socket for cleanup
+      socket.userId = userId;
+      global.notificationService.registerClient(userId, socket);
+      console.log(`� User ${userId} registered for notifications`);
 
-      socket.emit('driver-connected', {
+      // Emit confirmation
+      socket.emit('notification-ready', {
         success: true,
-        message: 'Driver dashboard connected',
-        driverId: driverId,
-        timestamp: new Date()
+        message: 'Registered for real-time notifications',
+        userId: userId
       });
     }
   });
 
-  // Register for notifications (real-time push)
-  socket.on('register-notifications', (userId) => {
-    if (userId && global.notificationService) {
+  // Auto-register for students based on session
+  socket.on('authenticate-session', (sessionData) => {
+    const { userId, role } = sessionData;
+    if (userId && role === 'student' && global.notificationService) {
+      socket.userId = userId;
       global.notificationService.registerClient(userId, socket);
-      console.log(`🔔 User ${userId} registered for notifications`);
+      console.log(`� Auto-registered student ${userId} for notifications`);
 
       socket.emit('notification-ready', {
         success: true,
-        message: 'Registered for real-time notifications',
+        message: 'Auto-registered for notifications',
         userId: userId
       });
     }

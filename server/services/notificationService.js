@@ -20,12 +20,10 @@ class NotificationService {
     // Send notification to a specific user
     pushNotification(userId, notification) {
         const client = this.clients.get(userId);
-        if (client && client.readyState === 1) { // WebSocket.OPEN
+        if (client) { // Socket.IO sockets don't use readyState checking like native WS
             try {
-                client.send(JSON.stringify({
-                    type: 'notification',
-                    data: notification
-                }));
+                // Use standard Space.IO emit
+                client.emit('receive-notification', notification);
                 console.log(`📨 Notification sent to user ${userId}`);
                 return true;
             } catch (error) {

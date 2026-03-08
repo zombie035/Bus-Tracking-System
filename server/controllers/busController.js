@@ -334,7 +334,26 @@ exports.updateBusLocation = async (req, res) => {
            ELSE idle_start_time
          END
        WHERE id = $7
-       RETURNING *`,
+       RETURNING 
+         id, 
+         bus_number as "busNumber",
+         route_name as "routeName",
+         capacity,
+         current_passengers as "currentPassengers",
+         status,
+         driver_id as "driverId",
+         latitude,
+         longitude,
+         speed,
+         trip_status as "tripStatus",
+         current_stop_index as "currentStopIndex",
+         delay_status as "delayStatus",
+         delay_minutes as "delayMinutes",
+         engine_status as "engineStatus",
+         direction,
+         next_stop_name as "nextStopName",
+         idle_start_time as "idleStartTime",
+         updated_at as "lastUpdated"`,
       [latitude, longitude, speed || 0, status || 'moving', engine_status, direction, id]
     );
 
@@ -352,19 +371,11 @@ exports.updateBusLocation = async (req, res) => {
     if (io) {
       io.to(`bus-${id}`).emit('bus-location-update', {
         busId: id,
-        busNumber: bus.bus_number,
-        latitude: bus.latitude,
-        longitude: bus.longitude,
-        speed: bus.speed,
-        status: bus.status,
-        engine_status: bus.engine_status,
-        direction: bus.direction,
-        idle_start_time: bus.idle_start_time,
+        ...bus,
         timestamp: new Date()
       });
 
-      // Also broadcast to admin channel if needed (or just relying on the client joining room? 
-      // Admin might not join specific bus rooms. Let's emit a global event for admins too)
+      // Also broadcast to admin channel
       io.emit('bus-live-update', {
         busId: id,
         ...bus,
@@ -390,7 +401,26 @@ exports.getBusByNumber = async (req, res) => {
   try {
     const { busNumber } = req.params;
     const result = await pool.query(
-      'SELECT * FROM buses WHERE bus_number = $1',
+      `SELECT 
+        id,
+        bus_number as "busNumber",
+        route_name as "routeName",
+        capacity,
+        current_passengers as "currentPassengers",
+        status,
+        driver_id as "driverId",
+        latitude,
+        longitude,
+        speed,
+        trip_status as "tripStatus",
+        current_stop_index as "currentStopIndex",
+        delay_status as "delayStatus",
+        delay_minutes as "delayMinutes",
+        engine_status as "engineStatus",
+        direction,
+        next_stop_name as "nextStopName",
+        updated_at as "lastUpdated"
+      FROM buses WHERE bus_number = $1`,
       [busNumber]
     );
 
@@ -418,7 +448,26 @@ exports.getBusesByStatus = async (req, res) => {
   try {
     const { status } = req.params;
     const result = await pool.query(
-      'SELECT * FROM buses WHERE status = $1',
+      `SELECT 
+        id,
+        bus_number as "busNumber",
+        route_name as "routeName",
+        capacity,
+        current_passengers as "currentPassengers",
+        status,
+        driver_id as "driverId",
+        latitude,
+        longitude,
+        speed,
+        trip_status as "tripStatus",
+        current_stop_index as "currentStopIndex",
+        delay_status as "delayStatus",
+        delay_minutes as "delayMinutes",
+        engine_status as "engineStatus",
+        direction,
+        next_stop_name as "nextStopName",
+        updated_at as "lastUpdated"
+      FROM buses WHERE status = $1`,
       [status]
     );
 
@@ -440,10 +489,29 @@ exports.getLiveBuses = async (req, res) => {
   try {
     // Return buses with recent updates (last 5 minutes)
     const result = await pool.query(
-      `SELECT * FROM buses 
-       WHERE status IN ('active', 'moving') 
-       AND updated_at > NOW() - INTERVAL '5 minutes'
-       ORDER BY updated_at DESC`
+      `SELECT 
+        id,
+        bus_number as "busNumber",
+        route_name as "routeName",
+        capacity,
+        current_passengers as "currentPassengers",
+        status,
+        driver_id as "driverId",
+        latitude,
+        longitude,
+        speed,
+        trip_status as "tripStatus",
+        current_stop_index as "currentStopIndex",
+        delay_status as "delayStatus",
+        delay_minutes as "delayMinutes",
+        engine_status as "engineStatus",
+        direction,
+        next_stop_name as "nextStopName",
+        updated_at as "lastUpdated"
+      FROM buses 
+      WHERE status IN ('active', 'moving') 
+      AND updated_at > NOW() - INTERVAL '5 minutes'
+      ORDER BY updated_at DESC`
     );
 
     res.json({

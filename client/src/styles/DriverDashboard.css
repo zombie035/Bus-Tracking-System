@@ -1,0 +1,1161 @@
+/* ========================================================
+   DRIVER DASHBOARD — CLEAN WHITE THEME
+   Default: White/Light Theme (Day Shift)
+   .dark-mode: Dark Industrial (Night Ops)
+   ======================================================== */
+
+/* ===== VARIABLES ===== */
+:root {
+  /* NEW COLOR PALETTE (Requested) */
+  --driver-bg: #E7F2EF;
+  /* Light Mist */
+  --driver-sidebar-bg: #19183B;
+  /* Deep Navy */
+  --driver-surface: #FFFFFF;
+  --driver-surface-active: #F0F4F8;
+  --driver-border: #A1C2BD;
+  /* Pale Teal */
+
+  --driver-text: #19183B;
+  --driver-text-dim: #708993;
+  --driver-text-muted: #94A3B8;
+  --driver-text-invert: #FFFFFF;
+
+  --driver-primary: #19183B;
+  --driver-primary-dim: rgba(25, 24, 59, 0.1);
+  --driver-success: #10B981;
+  --driver-success-dim: #D1FAE5;
+  --driver-warning: #FF9500;
+  --driver-warning-dim: rgba(255, 149, 0, 0.1);
+  --driver-danger: #E60000;
+  --driver-danger-dim: rgba(230, 0, 0, 0.1);
+  --driver-neutral: #708993;
+
+  --driver-purple: #8B5CF6;
+  --driver-accent: #A1C2BD;
+
+  /* ELEVATION & SHADOWS */
+  --driver-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --driver-shadow-lg: 0 10px 25px rgba(0, 71, 255, 0.08);
+  --driver-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.03);
+
+  /* ELEVATION & SHADOWS */
+  --driver-shadow: 0 4px 12px rgba(25, 24, 59, 0.08);
+  --driver-shadow-lg: 0 10px 25px rgba(25, 24, 59, 0.15);
+  --driver-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.03);
+
+  /* BORDER RADIUS */
+  --radius-xl: 20px;
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 4px;
+
+  /* TYPOGRAPHY */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* LAYOUT TOKENS */
+  --sidebar-width: 80px;
+  --sidebar-expanded-width: 240px;
+  --operational-panel-width: 400px;
+  --driver-padding: 24px;
+}
+
+/* DARK MODE (Updating darker elements if needed) */
+.dark-mode {
+  --driver-bg: #0F0F1A;
+  --driver-sidebar-bg: #050510;
+  --driver-surface: #1E1E2E;
+  --driver-surface-active: #27273A;
+  --driver-border: #708993;
+
+  --driver-text: #E7F2EF;
+  --driver-text-dim: #A1C2BD;
+  --driver-text-muted: #708993;
+  --driver-text-invert: #000000;
+
+  --driver-primary: #A1C2BD;
+  --driver-primary-dim: rgba(161, 194, 189, 0.2);
+}
+
+/* EMERGENCY MODE OVERRIDE */
+.emergency-mode {
+  --driver-bg: #fef2f2;
+  /* Red 50 */
+  --driver-surface: #ffffff;
+  --driver-border: #fecaca;
+  /* Red 200 */
+  --driver-text: #7f1d1d;
+  /* Red 900 */
+  --driver-primary: #dc2626;
+  /* Red 600 */
+}
+
+/* ===== GLOBAL LAYOUT ===== */
+.driver-dashboard-container {
+  min-height: 100vh;
+  background-color: var(--driver-bg);
+  color: var(--driver-text);
+  font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  padding-bottom: 90px;
+  /* Space for bottom nav */
+}
+
+/* DESKTOP LAYOUT ADJUSTMENTS */
+@media (min-width: 1024px) {
+  .driver-dashboard-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    /* Sidebar + Main Content */
+    grid-template-rows: 100vh;
+    padding-bottom: 0;
+    max-width: 1600px;
+    margin: 0 auto;
+    background: var(--driver-surface);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.05);
+  }
+
+  /* When on desktop, hide bottom nav and show sidebar if we implement one, 
+     but for now we'll layout the content to be centered and constrained */
+  .driver-scrollable {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 24px !important;
+  }
+
+  /* Make the map bigger on desktop */
+  .driver-map-container {
+    height: 70vh !important;
+  }
+
+  /* Grid layout for panels on desktop, Flex on mobile */
+  .desktop-grid-2 {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  @media (min-width: 1024px) {
+    .desktop-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+  }
+
+  /* Hide mobile version elements if any */
+}
+
+/* ===== COMPONENTS ===== */
+
+/* CARDS */
+.driver-card {
+  background: var(--driver-surface);
+  border: 1px solid var(--driver-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--driver-shadow);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.driver-glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+.dark-mode .driver-glass-card {
+  background: rgba(24, 24, 27, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* BUTTONS */
+.driver-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 15px;
+}
+
+.driver-btn:active {
+  transform: scale(0.98);
+}
+
+.driver-btn-primary {
+  background: var(--driver-primary);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.driver-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.driver-btn-success {
+  background: var(--driver-success);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);
+}
+
+.driver-btn-warning {
+  background: var(--driver-warning);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(217, 119, 6, 0.2);
+}
+
+.driver-btn-danger {
+  background: var(--driver-danger);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
+}
+
+.driver-btn-ghost {
+  background: transparent;
+  color: var(--driver-text-muted);
+  border: 1px solid var(--driver-border);
+}
+
+.driver-btn-ghost:hover {
+  background: var(--driver-surface-active);
+  color: var(--driver-text);
+}
+
+.driver-btn-xl {
+  padding: 16px 32px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: var(--radius-lg);
+}
+
+/* TOP NAVBAR */
+.driver-navbar {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--driver-border);
+  padding: 12px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dark-mode .driver-navbar {
+  background: rgba(9, 9, 11, 0.85);
+}
+
+.driver-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--driver-text);
+  margin: 0;
+}
+
+/* STATUS BADGES */
+.driver-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.driver-badge.live {
+  background: var(--driver-success-dim);
+  color: var(--driver-success);
+}
+
+.driver-badge.offline {
+  background: var(--driver-surface-active);
+  color: var(--driver-text-muted);
+}
+
+.driver-badge.ready {
+  background: var(--driver-neutral);
+  color: white;
+}
+
+.driver-badge.en-route {
+  background: var(--driver-success);
+  color: white;
+}
+
+.driver-badge.delayed {
+  background: var(--driver-warning);
+  color: white;
+}
+
+.driver-badge.emergency {
+  background: var(--driver-danger);
+  color: white;
+}
+
+.driver-badge.completed {
+  background: var(--driver-primary);
+  color: white;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.live .status-dot {
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* STAT CARDS */
+.stat-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.driver-stat-card {
+  background: var(--driver-surface);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+}
+
+.driver-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--driver-text);
+}
+
+.driver-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--driver-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--driver-text);
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--driver-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+/* SECTION HEADER */
+.driver-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--driver-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* CONTROL PANEL */
+.control-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* MAP OVERLAYS */
+.map-overlay-stats {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 400;
+}
+
+.map-pill-stat {
+  background: var(--driver-surface);
+  color: var(--driver-text);
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-weight: 700;
+  box-shadow: var(--driver-shadow-lg);
+  border: 1px solid var(--driver-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* MAP STATS - NEW */
+.driver-map-stats {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 400;
+}
+
+.driver-map-stat {
+  background: var(--driver-surface);
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: var(--driver-shadow-lg);
+  border: 1px solid var(--driver-border);
+  text-align: center;
+  min-width: 70px;
+}
+
+.driver-map-stat .stat-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--driver-text);
+  line-height: 1.1;
+}
+
+.driver-map-stat .stat-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--driver-text-muted);
+  text-transform: uppercase;
+}
+
+/* Main App Structure - 3 Column Layout from Image */
+.driver-dashboard {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr var(--operational-panel-width);
+  height: 100vh;
+  overflow: hidden;
+  background: var(--driver-bg);
+}
+
+@media (max-width: 1200px) {
+  .driver-dashboard {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+
+  .driver-operational-panel {
+    display: none;
+  }
+}
+
+/* 1. SIDEBAR (Left) */
+.driver-sidebar-wrapper {
+  grid-column: 1;
+  position: relative;
+  width: var(--sidebar-width);
+}
+
+.driver-bottom-nav {
+  background: var(--driver-sidebar-bg);
+  border-right: 1px solid var(--driver-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+  z-index: 2005;
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: absolute;
+  /* Overlaps content when expanding */
+  left: 0;
+  top: 0;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.driver-bottom-nav:hover {
+  width: var(--sidebar-expanded-width);
+}
+
+.nav-items {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding-top: 20px;
+}
+
+.nav-item {
+  width: 100%;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* Align to start for expansion */
+  padding: 0 28px;
+  color: var(--driver-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  background: none;
+  border: none;
+  white-space: nowrap;
+}
+
+.nav-item i {
+  font-size: 20px;
+  width: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.nav-label {
+  margin-left: 20px;
+  font-size: 15px;
+  font-weight: 700;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.driver-bottom-nav:hover .nav-label {
+  opacity: 1;
+  visibility: visible;
+}
+
+.nav-item:hover {
+  color: var(--driver-accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+  color: white;
+  background: var(--driver-accent) !important;
+  color: var(--driver-sidebar-bg) !important;
+}
+
+.nav-item.active i {
+  color: inherit;
+}
+
+/* Sidebar Footer & User */
+.sidebar-user {
+  margin-bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.user-avatar {
+  width: 44px;
+  height: 44px;
+  background: var(--driver-accent);
+  color: var(--driver-sidebar-bg);
+}
+
+.sidebar-footer {
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+
+/* 2. OPERATIONAL PANEL (Right) */
+.driver-operational-panel {
+  background: var(--driver-bg);
+  border-left: 1px solid var(--driver-border);
+  padding: var(--driver-padding);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  z-index: 1004;
+}
+
+/* GLASS CARD REPRO (Pure & Sharp from image) */
+.driver-glass-card {
+  background: var(--driver-bg);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow-card);
+  overflow: hidden;
+  position: relative;
+}
+
+/* BUTTONS MATCH */
+.driver-btn-primary {
+  background: var(--driver-primary);
+  color: white;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.driver-btn-warning {
+  background: var(--driver-warning);
+  color: white;
+}
+
+.driver-btn-danger {
+  background: var(--driver-danger);
+  color: white;
+}
+
+/* BADGES MAPPING (from image) */
+.driver-badge.live {
+  background: var(--driver-success-dim);
+  color: var(--driver-success);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* 3. MAP OVERLAYS */
+.map-controls-floating {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1003;
+}
+
+.map-control-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--driver-bg);
+  border: 1px solid var(--driver-border);
+  border-radius: var(--radius-md);
+  color: var(--driver-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--driver-shadow);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.map-control-btn:hover {
+  background: var(--driver-surface-active);
+  color: var(--driver-primary);
+}
+
+.bottom-actions-floating {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 1003;
+}
+
+/* 4. STOP LIST (OPERATIONAL PANEL) */
+.stop-list-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--driver-border);
+}
+
+.stop-list-item:last-child {
+  border-bottom: none;
+}
+
+.stop-list-item.active {
+  background: var(--driver-surface-active);
+  border: 1px solid var(--driver-primary);
+  border-radius: var(--radius-lg);
+  margin: 4px 0;
+}
+
+.stop-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--driver-border);
+  color: var(--driver-text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.stop-list-item.active .stop-number {
+  background: var(--driver-primary);
+  color: white;
+}
+
+.stop-list-item.completed .stop-number {
+  background: var(--driver-neutral);
+  color: white;
+}
+
+.stop-info {
+  flex: 1;
+}
+
+.stop-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--driver-text);
+}
+
+.stop-meta {
+  font-size: 12px;
+  color: var(--driver-text-muted);
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.status-check {
+  color: var(--driver-success);
+  font-size: 20px;
+}
+
+/* SPINNER */
+.driver-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--driver-border);
+  border-top-color: var(--driver-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* TOAST */
+.driver-toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--driver-surface);
+  color: var(--driver-text);
+  padding: 12px 24px;
+  border-radius: 100px;
+  box-shadow: var(--driver-shadow-lg);
+  border: 1px solid var(--driver-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2000;
+  font-weight: 600;
+  animation: slide-down 0.3s ease-out;
+}
+
+.driver-toast.success {
+  border-left: 4px solid var(--driver-success);
+}
+
+.driver-toast.error {
+  border-left: 4px solid var(--driver-danger);
+}
+
+.driver-toast.info {
+  border-left: 4px solid var(--driver-primary);
+}
+
+@keyframes slide-down {
+  from {
+    transform: translate(-50%, -20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* UTILITIES */
+.highlight-text {
+  color: var(--driver-primary);
+}
+
+.text-dim {
+  color: var(--driver-text-dim);
+}
+
+.text-muted {
+  color: var(--driver-text-muted);
+}
+
+.w-full {
+  width: 100%;
+}
+
+/* SCROLLBAR */
+.driver-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--driver-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--driver-text-muted);
+}
+
+/* ========================================================
+   LAYOUT & NAVIGATION CUSTOMIZATION
+   ======================================================== */
+
+/* 1. DENSITY OVERRIDES */
+body.density-compact {
+  --driver-padding: 10px;
+  --driver-font-base: 12px;
+  --driver-btn-height: 36px;
+}
+
+body.density-large {
+  --driver-padding: 24px;
+  --driver-font-base: 18px;
+  --driver-btn-height: 56px;
+}
+
+/* 2. HIGH CONTRAST MODE */
+body.high-contrast-mode {
+  --driver-bg: #ffffff !important;
+  --driver-surface: #ffffff !important;
+  --driver-text: #000000 !important;
+  --driver-text-dim: #000000 !important;
+  --driver-text-muted: #000000 !important;
+  --driver-border: #000000 !important;
+  --driver-primary: #0000ff !important;
+  --driver-success: #008000 !important;
+  --driver-danger: #ff0000 !important;
+  --driver-warning: #ff8c00 !important;
+  --driver-shadow: none !important;
+  --driver-shadow-lg: none !important;
+}
+
+body.high-contrast-mode .driver-glass-card,
+body.high-contrast-mode .driver-card {
+  background: white !important;
+  border: 4px solid black !important;
+  box-shadow: none !important;
+}
+
+body.high-contrast-mode .driver-btn {
+  border: 3px solid black !important;
+  color: black !important;
+  font-weight: 800 !important;
+}
+
+/* 3. NAVBAR POSITIONING */
+body.nav-pos-top .driver-bottom-nav {
+  bottom: auto !important;
+  top: 0 !important;
+  border-bottom: 2px solid var(--driver-border) !important;
+  border-top: none !important;
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+body.nav-pos-top .driver-dashboard-container {
+  padding-bottom: 0 !important;
+  padding-top: 75px !important;
+}
+
+body.nav-pos-floating .driver-bottom-nav {
+  bottom: 25px !important;
+  left: 15px !important;
+  right: 15px !important;
+  width: calc(100% - 30px) !important;
+  border-radius: 40px !important;
+  border: 2px solid var(--driver-border) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+@media (min-width: 1024px) {
+  body.nav-pos-sidebar .driver-bottom-nav {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 90px !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    border-right: 2px solid var(--driver-border) !important;
+    border-top: none !important;
+    padding: 30px 0 !important;
+    z-index: 1000;
+  }
+
+  body.nav-pos-sidebar .driver-dashboard-container {
+    padding-left: 90px !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.nav-pos-sidebar .nav-tab {
+    flex-direction: column;
+    height: 80px;
+    gap: 6px;
+    padding: 10px 0;
+  }
+}
+
+/* 4. NAVIGATION STYLE */
+body.nav-style-icons span {
+  display: none !important;
+}
+
+body.nav-style-icons i {
+  font-size: 20px !important;
+}
+
+body.nav-style-compact .nav-tab {
+  height: 48px !important;
+}
+
+body.nav-style-compact .nav-tab i {
+  font-size: 16px !important;
+}
+
+body.nav-style-large .nav-tab {
+  height: 90px !important;
+}
+
+body.nav-style-large .nav-tab i {
+  font-size: 26px !important;
+}
+
+body.nav-style-large .nav-tab span {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+/* 5. MAP CONTROLS */
+body.map-controls-left .leaflet-right {
+  right: auto !important;
+  left: 10px !important;
+}
+
+body.map-controls-left .recenter-btn {
+  right: auto !important;
+  left: 20px !important;
+}
+
+/* 6. EMERGENCY BUTTON POSITION */
+body.emergency-pos-floating-bottom .sos-floating {
+  bottom: 110px !important;
+  right: 20px !important;
+}
+
+body.emergency-pos-top-right .sos-floating {
+  top: 90px !important;
+  bottom: auto !important;
+  right: 20px !important;
+}
+
+body.emergency-pos-fixed-bottom .sos-floating {
+  display: none !important;
+}
+
+/* 7. TRIP CONTROLS LAYOUT */
+.trip-controls-floating {
+  position: relative;
+  height: 100%;
+}
+
+.floating-trip-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  z-index: 1001;
+}
+
+.floating-trip-panel .driver-glass-card {
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 24px !important;
+}
+
+/* POLISH & FIXES */
+.high-contrast-mode .nav-item.active {
+  background: black !important;
+  color: white !important;
+}
+
+.high-contrast-mode .driver-badge {
+  border: 1px solid black !important;
+  color: black !important;
+}
+
+/* 8. BOTTOM PANEL BEHAVIOR */
+.driver-bottom-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1002;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.driver-bottom-panel.collapsed {
+  transform: translateY(calc(0%));
+  /* Adjusted by internal component height or CSS */
+}
+
+/* Ensure StopManagementPanel occupies proper height when expanded */
+.driver-bottom-panel.expanded .driver-glass-card {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+/* Floating variant for bottom panel if configured */
+body.bottom-sheet-floating .driver-bottom-panel {
+  left: 15px;
+  right: 15px;
+  bottom: 15px;
+  border-radius: 20px;
+}
+
+body.bottom-sheet-floating .driver-bottom-panel.expanded {
+  bottom: 80px;
+  /* Space for nav */
+}
+
+/* 9. SETTINGS UI IMPROVEMENTS */
+/* FLOATING BUTTONS POLISH */
+.bottom-actions-floating .map-control-btn {
+  background: white !important;
+  color: var(--driver-text) !important;
+  height: 48px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  border: none !important;
+  padding: 0 24px !important;
+  transition: transform 0.2s ease;
+}
+
+.bottom-actions-floating .map-control-btn:hover {
+  transform: translateY(-2px);
+  background: var(--driver-surface-active) !important;
+}
+
+.bottom-actions-floating .driver-btn-warning {
+  height: 48px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.3) !important;
+}
+
+.settings-controls-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 640px) {
+  .settings-controls-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.driver-setting-item.vertical {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.settings-option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.settings-option-flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-option-flex .driver-btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+.setting-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--driver-surface-active);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+}
+
+.setting-sublabel {
+  font-size: 13px;
+  color: var(--driver-text-dim);
+  font-weight: 500;
+}
